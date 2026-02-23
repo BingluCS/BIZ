@@ -903,8 +903,13 @@ namespace SZ3 {
         auto odd_len = len / 2;
         auto even_len = len - odd_len;
         size_t i = 0;
-
-        if constexpr (std::is_same_v<T, float>) {
+        if constexpr (CompMode == COMPMODE::DECOMP) {
+            for (; i + 1  < even_len; ++i) {
+                size_t start = ((i << 1) + 1) * offset;
+                quantize_func(cur_ij_offset + start,  data[start], interp_linear(buf[i], buf[i + 1]), tid);
+            }
+        }
+        else if constexpr (std::is_same_v<T, float>) {
             // const size_t step = AVX_256_parallelism;
             const size_t step = 16;
             svbool_t pg = svptrue_b32();
@@ -953,15 +958,15 @@ namespace SZ3 {
 
                     // dequantization for decompression
 
-                    svfloat64_t decompressed_even_f64 = svmla_f64_x(pg64, svmul_n_f64_x(pg64, quant_even_f64, real_ebx2), s
-                                    vcvt_f64_f32_x(pg64, svuzp1_f32(sum, sum)));
-                    svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svmul_n_f64_x(pg64, quant_odd_f64, real_ebx2), 
-                                    svcvt_f64_f32_x(pg64, svuzp2_f32(sum, sum)));
+                    svfloat64_t decompressed_even_f64 = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, svuzp1_f32(sum, sum)), 
+                            quant_even_f64, svdup_f64(real_ebx2));
+                    svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, svuzp2_f32(sum, sum)), 
+                            quant_odd_f64, svdup_f64(real_ebx2));
                     
                     quant_sve = svzip1_f32(svcvt_f32_f64_x(pg64, quant_even_f64), svcvt_f32_f64_x(pg64, quant_odd_f64));
                     svfloat32_t decompressed = svzip1_f32(svcvt_f32_f64_x(pg64, decompressed_even_f64), svcvt_f32_f64_x(pg64, decompressed_odd_f64));
                     T tmp[step];
-                    _svst1(pg, tmp, decompressed);
+                    svst1_f32(pg, tmp, decompressed);
                     svfloat32_t err_dequan = svsub_f32_x(pg, decompressed, ori_sve);
                     quant_sve = svadd_n_f32_x(pg, quant_sve, radius);
 
