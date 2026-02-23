@@ -18,7 +18,7 @@
 #include <immintrin.h>
 #endif
 
-#elif defined(__ARM_FEATURE_SVE2) 
+#ifdef __ARM_FEATURE_SVE2
 #include <arm_sve.h>
 #endif
 
