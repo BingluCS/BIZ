@@ -1,7 +1,6 @@
 
 namespace SZ3 {
 #ifdef __AVX2__
-
     template <TUNING Tuning, class T, uint N, class Quantizer>
     template <COMPMODE CompMode, class QuantizeFunc>
     ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_linear_and_quantize_1D(const T * buf, const size_t &len, T* data, 
@@ -893,8 +892,310 @@ namespace SZ3 {
             quant_index += j;  
         }
     }
-#else
+#elif defined(__ARM_FEATURE_SVE2) 
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_linear_and_quantize_1D(const T * buf, const size_t &len, T* data, 
+        size_t&  offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+        if(len == 1)
+            return;
 
+        auto odd_len = len / 2;
+        auto even_len = len - odd_len;
+        size_t i = 0;
+
+        if constexpr (std::is_same_v<T, float>) {
+            // const size_t step = AVX_256_parallelism;
+            const size_t step = 16;
+             svbool_t pg = svptrue_b32();
+            for (; i + 1  < even_len; i += step) { // 3 is not AVX_256_parallelism - 1 !!
+                // predict
+                // svbool_t pg = svwhilelt_b32(i, even_len - 1);
+                svbool_t pg = svptrue_b32();
+                svfloat32_t va = svld1(pg, &buf[i]);
+                svfloat32_t vb = svld1(pg, &buf[i + 1]);
+
+                svfloat32_t sum = svadd_f32(pg, va, vb);
+                sum = svmul_n_f32(pg, sum, factor);
+                // quantize
+                size_t start = (i << 1) + 1;
+                // i = k / 2;
+
+                if constexpr (CompMode == COMPMODE::COMP) {
+                    T ori[step];
+                    size_t base = start * offset;
+                    size_t offsetx2 = offset << 1;
+
+                    #pragma unroll
+                    for (size_t j = 0; j < step; ++j) {
+                        ori[j] = data[base + j * offsetx2];
+                    }
+
+                    svfloat32_t ori_sve = svld1(pg, ori);
+                    svfloat32_t quant_sve = svsub_f32(pg, ori_sve, sum); // prediction error
+
+                    // __m256 ori_avx = _mm256_loadu_ps(ori);
+                    // __m256 quant_avx = _mm256_sub_ps(ori_avx, sum); // prediction error
+                    // float tmp[8];
+                    // quantize_1D_float(sum, ori_avx, quant_avx, tmp);
+                    // int quant_vals[8];
+                    // __m256i quant_avx_i = _mm256_cvtps_epi32(quant_avx);
+                    // _mm256_storeu_si256(reinterpret_cast<__m256i*>(quant_vals), quant_avx_i);
+                    // size_t j = 0;
+                    // #pragma unroll
+                    // for ( ; j < step && i + j + 1 < odd_len; ++j) {
+                    //     if (quant_vals[j] != 0) 
+                    //         data[(start + (j << 1)) * offset] = tmp[j];
+                    //     else
+                    //         quantizer.force_save_unpred(ori[j]);
+                    //     ++frequency[quant_vals[j]];
+                    // }
+                    // _mm256_storeu_si256(
+                    //     reinterpret_cast<__m256i*>(quant_inds + quant_index),
+                    //     quant_avx_i
+                    // );
+                    // quant_index += j;
+                }
+                else if constexpr (CompMode == COMPMODE::DECOMP) { // decomp
+                    // __m256i quant_avx_i = _mm256_loadu_si256(
+                    //     reinterpret_cast<__m256i*>(quant_inds + quant_index));
+                    // int quant_vals[8];
+                    // _mm256_storeu_si256(reinterpret_cast<__m256i*>(quant_vals), quant_avx_i);
+                    // quant_avx_i = _mm256_sub_epi32(quant_avx_i, radius_avx_256i);
+                    
+                    // __m256d decompressed_low  = _mm256_cvtepi32_pd(_mm256_castsi256_si128(quant_avx_i));
+                    // decompressed_low = _mm256_mul_pd(decompressed_low, ebx2_avx);
+                    
+                    // __m256d decompressed_high = _mm256_cvtepi32_pd(_mm256_extracti128_si256(quant_avx_i, 1));
+                    // decompressed_high = _mm256_mul_pd(decompressed_high, ebx2_avx);
+
+                    //  __m256 decompressed = _mm256_insertf128_ps(
+                    //     _mm256_castps128_ps256(_mm256_cvtpd_ps(decompressed_low)),
+                    //     _mm256_cvtpd_ps(decompressed_high), 1);
+                    // decompressed = _mm256_add_ps(decompressed, sum);
+                    // float tmp[8];
+                    // _mm256_storeu_ps(tmp, decompressed);
+                    
+                    // size_t j = 0;
+                    // for ( ; j < step && i + j + 1< odd_len; ++j) {
+                    //     if (quant_vals[j] != 0) 
+                    //         data[(start + (j << 1)) * offset] = tmp[j];
+                    //     else 
+                    //         data[(start + (j << 1)) * offset] = quantizer.recover_unpred();
+                    // }
+                    // quant_index += j;
+                }
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>) {
+            // const size_t step = AVX_256_parallelism;
+            // const __m256d factor = _mm256_set1_pd(0.5);
+            
+            // for (; i + 1 < even_len; i += step) { // 3 is not AVX_256_parallelism - 1 !!
+            //     __m256d va = _mm256_loadu_pd(buf + i);
+            //     __m256d vb = _mm256_loadu_pd(buf + i + 1);
+
+            //     __m256d sum = _mm256_add_pd(va, vb);   
+            //     sum = _mm256_mul_pd(sum, factor);    
+
+            //     size_t start = (i << 1) + 1;
+            //     if constexpr (CompMode == COMPMODE::COMP) {
+            //         T ori[4];
+            //         size_t base = start * offset;
+            //         size_t offsetx2 = offset << 1;
+
+            //         ori[0] = data[base];
+            //         ori[1] = data[base + offsetx2];
+            //         ori[2] = data[base + (offsetx2 << 1)];
+            //         ori[3] = data[base + 3 * offsetx2];
+
+            //         __m256d ori_avx = _mm256_loadu_pd(ori);
+            //         __m256d quant_avx = _mm256_sub_pd(ori_avx, sum); // prediction error
+            //         T tmp[4];
+            //         quantize_1D_double(sum, ori_avx, quant_avx, tmp);
+
+            //         int quant_vals[4];
+            //         __m128i quant_avx_i = _mm256_cvtpd_epi32(quant_avx);
+                    
+            //         _mm_storeu_si128(reinterpret_cast<__m128i*>(quant_vals), quant_avx_i);
+            //         size_t j = 0;
+            //         for ( ; j < step && i + j + 1 < odd_len; ++j) {
+            //             if (quant_vals[j] != 0)
+            //                 data[(start + (j << 1)) * offset] = tmp[j];
+            //             else 
+            //                 quantizer.force_save_unpred(ori[j]);
+            //             ++frequency[quant_vals[j]];
+            //         }
+            //         _mm_storeu_si128(
+            //             reinterpret_cast<__m128i*>(quant_inds + quant_index),
+            //             quant_avx_i
+            //         );
+            //         quant_index += j;
+            //     }
+            //     else if constexpr (CompMode == COMPMODE::DECOMP) { // decomp
+            //         __m128i quant_avx_i = _mm_loadu_si128(
+            //             reinterpret_cast<__m128i*>(quant_inds + quant_index));
+            //         int quant_vals[4];
+            //         _mm_storeu_si128(reinterpret_cast<__m128i*>(quant_vals), quant_avx_i);
+            //         quant_avx_i = _mm_sub_epi32(quant_avx_i, radius_avx_128i);
+
+            //         __m256d decompressed = _mm256_fmadd_pd(_mm256_cvtepi32_pd(quant_avx_i), 
+            //                                 ebx2_avx, sum);
+            //         T tmp[4];
+            //         _mm256_storeu_pd(tmp, decompressed);
+                    
+            //         size_t j = 0;
+            //         for ( ; j < step && i + j + 1 < odd_len; ++j) {
+            //             if (quant_vals[j] != 0) 
+            //                 data[(start + (j << 1)) * offset] = tmp[j];
+            //             else
+            //                 data[(start + (j << 1)) * offset] = quantizer.recover_unpred();
+            //         }
+            //         quant_index += j;  
+            //     }
+
+            // }
+        }
+        // size_t i = 0;
+
+        // for (; i + 1  < even_len; ++i) {
+        //     size_t start = ((i << 1) + 1) * offset;
+        //     quantize_func(cur_ij_offset + start,  data[start], interp_linear(buf[i], buf[i + 1]));
+        // }
+        T pred_edge;
+        if(len < 3 )
+            pred_edge = buf[even_len - 1];
+        else 
+            pred_edge = interp_linear1(buf[even_len - 2], buf[even_len - 1]);
+        int last = 2 * odd_len - 1;
+        quantize_func(cur_ij_offset + last * offset , data[last * offset], pred_edge);
+    }
+
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_cubic_and_quantize_1D(const T * buf, const size_t &len, T* data, 
+        size_t&  offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+       // assert(len <= max_dim);
+        if(len == 1)
+            return;
+
+        auto odd_len = len / 2;
+        auto even_len = len - odd_len;
+        
+        T pred_first; 
+        if(even_len < 2)
+            pred_first = (buf[0]);
+        else if(even_len < 3)
+            pred_first = interp_linear(buf[0], buf[1]);
+        else 
+            pred_first = interp_quad_1(buf[0], buf[1], buf[2]);
+        quantize_func(cur_ij_offset + offset , data[offset], pred_first);
+
+        size_t i = 0;
+        for (; i + 3  < even_len; ++i) {
+            size_t start = ((i << 1) + 3) * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_cubic(buf[i], buf[i + 1], buf[i + 2], buf[i + 3]));
+        }
+        
+        if(odd_len > 1){
+            if(odd_len < even_len){//the only boundary is p[len- 1] 
+                //odd_len < even_len so even_len > 2
+                T edge_pred;
+                edge_pred = interp_quad_2(buf[even_len - 3], buf[even_len - 2], buf[even_len - 1]);
+                int last = 2 * odd_len - 1;
+                quantize_func(cur_ij_offset + last * offset, data[last * offset], edge_pred);
+
+            }
+            else{//the boundary points are is p[len -2 ] and p[len -1 ]
+                T edge_pred;
+                if(odd_len > 2){ //len - 2
+                 //odd_len = even_len so even_len > 2
+                    edge_pred = interp_quad_2(buf[even_len - 3],  buf[even_len - 2], buf[even_len - 1]);
+                    int last = 2 * odd_len - 3;
+                    quantize_func(cur_ij_offset + last * offset, data[last * offset], edge_pred);
+                }
+                //len -1
+                //odd_len = even_len so even_len > 1
+                    edge_pred = interp_linear1(buf[even_len - 2], buf[even_len - 1]);
+                    int last = 2 * odd_len - 1;
+                    quantize_func(cur_ij_offset + last * offset, data[last * offset], edge_pred);
+                
+
+            }
+        }
+    }
+
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_linear_and_quantize(const T * a, const T* b, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_linear(a[i], b[i]));
+        }
+    }
+
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_cubic_and_quantize(const T * a, const T* b, T* c, T*d, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_cubic(a[i], b[i], c[i], d[i]));
+        }
+    }
+    
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_equal_and_quantize(const T * a, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], a[i]);
+        }
+    }
+
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_linear1_and_quantize(const T * a, const T* b, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+  
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_linear1(a[i], b[i]));
+        }
+    }
+
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_quad1_and_quantize(const T * a, const T* b, const T* c, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_quad_1(a[i], b[i], c[i]));
+        }
+      
+    }
+
+    template <TUNING Tuning, class T, uint N, class Quantizer>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_quad2_and_quantize(const T * a, const T* b, const T* c, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_quad_2(a[i], b[i], c[i]));
+        }
+      
+    }
+#else
     template <TUNING Tuning, class T, uint N, class Quantizer>
     template <COMPMODE CompMode, class QuantizeFunc>
     ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_linear_and_quantize_1D(const T * buf, const size_t &len, T* data, 
@@ -1043,8 +1344,6 @@ namespace SZ3 {
         }
       
     }
-
-
 #endif
 
 }

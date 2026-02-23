@@ -891,7 +891,154 @@ namespace SZ3 {
             local_quant_index[tid].value += j;  
         }
     }
-#else
+#elif defined(__ARM_FEATURE_SVE2) 
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_linear_and_quantize_1D(const T * buf, const size_t &len, T* data, 
+        size_t&  offset, size_t& cur_ij_offset, int& tid, QuantizeFunc &&quantize_func) {
+
+        if(len == 1)
+            return;
+
+        auto odd_len = len / 2;
+        auto even_len = len - odd_len;
+        size_t i = 0;
+
+        for (; i + 1  < even_len; ++i) {
+            size_t start = ((i << 1) + 1) * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_linear(buf[i], buf[i + 1]), tid);
+        }
+        T pred_edge;
+        if(len < 3 )
+            pred_edge = buf[even_len - 1];
+        else 
+            pred_edge = interp_linear1(buf[even_len - 2], buf[even_len - 1]);
+        int last = 2 * odd_len - 1;
+        quantize_func(cur_ij_offset + last * offset , data[last * offset], pred_edge, tid);
+    }
+
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_cubic_and_quantize_1D(const T * buf, const size_t &len, T* data, 
+        size_t&  offset, size_t& cur_ij_offset, int& tid, QuantizeFunc &&quantize_func) {
+       // assert(len <= max_dim);
+        if(len == 1)
+            return;
+
+        auto odd_len = len / 2;
+        auto even_len = len - odd_len;
+        
+        T pred_first; 
+        if(even_len < 2)
+            pred_first = (buf[0]);
+        else if(even_len < 3)
+            pred_first = interp_linear(buf[0], buf[1]);
+        else 
+            pred_first = interp_quad_1(buf[0], buf[1], buf[2]);
+        quantize_func(cur_ij_offset + offset , data[offset], pred_first, tid);
+
+        size_t i = 0;
+        for (; i + 3  < even_len; ++i) {
+            size_t start = ((i << 1) + 3) * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_cubic(buf[i], buf[i + 1], buf[i + 2], buf[i + 3]), tid);
+        }
+        
+        if(odd_len > 1){
+            if(odd_len < even_len){//the only boundary is p[len- 1] 
+                //odd_len < even_len so even_len > 2
+                T edge_pred;
+                edge_pred = interp_quad_2(buf[even_len - 3], buf[even_len - 2], buf[even_len - 1]);
+                int last = 2 * odd_len - 1;
+                quantize_func(cur_ij_offset + last * offset, data[last * offset], edge_pred, tid);
+
+            }
+            else{//the boundary points are is p[len -2 ] and p[len -1 ]
+                T edge_pred;
+                if(odd_len > 2){ //len - 2
+                 //odd_len = even_len so even_len > 2
+                    edge_pred = interp_quad_2(buf[even_len - 3],  buf[even_len - 2], buf[even_len - 1]);
+                    int last = 2 * odd_len - 3;
+                    quantize_func(cur_ij_offset + last * offset, data[last * offset], edge_pred, tid);
+                }
+                //len -1
+                //odd_len = even_len so even_len > 1
+                    edge_pred = interp_linear1(buf[even_len - 2], buf[even_len - 1]);
+                    int last = 2 * odd_len - 1;
+                    quantize_func(cur_ij_offset + last * offset, data[last * offset], edge_pred, tid);
+            }
+        }
+    }
+
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_linear_and_quantize(const T * a, const T* b, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, int tid, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_linear(a[i], b[i]), tid);
+        }
+
+    }
+
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_cubic_and_quantize(const T * a, const T* b, T* c, T*d, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, int tid, QuantizeFunc &&quantize_func) {
+
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_cubic(a[i], b[i], c[i], d[i]), tid);
+        }
+    }
+    
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_equal_and_quantize(const T * a, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, int tid, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], a[i], tid);
+        }
+    }
+
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_linear1_and_quantize(const T * a, const T* b, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, int tid, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_linear1(a[i], b[i]), tid);
+        }
+    }
+
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_quad1_and_quantize(const T * a, const T* b, const T* c, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, int tid, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_quad_1(a[i], b[i], c[i]), tid);
+        }
+      
+    }
+
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, class QuantizeFunc>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::interp_quad2_and_quantize(const T * a, const T* b, const T* c, size_t &len, T* data, 
+        size_t& offset, size_t& cur_ij_offset, int tid, QuantizeFunc &&quantize_func) {
+        size_t i = 0;
+        for (; i < len; ++i) {
+            size_t start = i * offset;
+            quantize_func(cur_ij_offset + start,  data[start], interp_quad_2(a[i], b[i], c[i]), tid);
+        }
+      
+    }
+#else 
 
     template <class T, uint N, class QuantizerOMP>
     template <COMPMODE CompMode, class QuantizeFunc>

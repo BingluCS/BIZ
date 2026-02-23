@@ -11,6 +11,7 @@ include(GNUInstallDirs)
 
 option(BUILD_SHARED_LIBS "build shared libraries by default" ON)
 option(ENABLE_AVX2 "Enable AVX2 instruction set compilation" OFF )
+option(ENABLE_SVE2 "Enable SVE2 instruction set compilation" OFF )
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
@@ -113,6 +114,18 @@ if(ENABLE_AVX2)
 else()
   message(STATUS "AVX2 compilation disabled.")
 endif()
+
+if(ENABLE_SVE2)
+  message(STATUS "SVE2 compilation enabled.")
+  target_compile_options(${PROJECT_NAME} INTERFACE -march=armv8.6-a+sve2)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(WARNING "Compiler '${CMAKE_CXX_COMPILER_ID}' might not explicitly support SVE2 flags. Please add them manually if needed.")
+  endif()
+else()
+  message(STATUS "SVE2 compilation disabled.")
+endif()
+
+
 install(TARGETS ${PROJECT_NAME}
         EXPORT SZ3Targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
