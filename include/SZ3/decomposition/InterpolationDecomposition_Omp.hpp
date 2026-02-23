@@ -5,7 +5,6 @@
 #include <omp.h>
 #include <cmath>
 #include <cstring>
-#include <immintrin.h>
 #include "Decomposition.hpp"
 #include "SZ3/def.hpp"
 #include "SZ3/quantizer/Quantizer.hpp"
@@ -17,10 +16,12 @@
 #include "SZ3/utils/MemoryUtil.hpp"
 #include "SZ3/utils/Timer.hpp"
 #include "SZ3/utils/BlockwiseIterator.hpp"
-#define AVXMODE AVX512
-// #define AVXMODE AVX256
+
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
+
 namespace SZ3 {
-// enum class AVXMODE { AVX256, AVX512 };
 template <class T, uint N, class QuantizerOMP>
 class InterpolationDecomposition_OMP : public concepts::DecompositionInterface_OMP<T, int, N> {
 
@@ -3241,7 +3242,7 @@ template <COMPMODE CompMode, class QuantizeFunc>
     int* total_quant_inds;
     int** local_quant_inds;
     CacheLineInt* local_quant_index; 
-
+#ifdef __AVX2__
     // for avx
     __m256d radius_avx;
     __m256d nradius_avx;
@@ -3261,7 +3262,7 @@ template <COMPMODE CompMode, class QuantizeFunc>
     __m256d rel_eb_avx_d;
     __m256d nrel_eb_avx_d;
     __m128i radius_avx_128i;
-
+#endif
 
     //std::vector<size_t> level_prefix;
     //std::vector<std::array<size_t,N> >reduced_dim_offsets;
@@ -3276,6 +3277,6 @@ InterpolationDecomposition_OMP<T, N, QuantizerOMP> make_decomposition_interpolat
 
 }  // namespace SZ3
 
-#include "InterpolationOmp_avx.inl"
+#include "Interpolation_quantizer_Omp.inl"
 #endif
 #endif
