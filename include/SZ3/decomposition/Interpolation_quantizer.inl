@@ -907,7 +907,8 @@ namespace SZ3 {
         if constexpr (std::is_same_v<T, float>) {
             // const size_t step = AVX_256_parallelism;
             const size_t step = 16;
-             svbool_t pg = svptrue_b32();
+            svbool_t pg = svptrue_b32();
+            svbool_t pg64 = svptrue_b64();
             for (; i + 1  < even_len; i += step) { // 3 is not AVX_256_parallelism - 1 !!
                 // predict
                 // svbool_t pg = svwhilelt_b32(i, even_len - 1);
@@ -915,8 +916,8 @@ namespace SZ3 {
                 svfloat32_t va = svld1(pg, &buf[i]);
                 svfloat32_t vb = svld1(pg, &buf[i + 1]);
 
-                svfloat32_t sum = svadd_f32(pg, va, vb);
-                sum = svmul_n_f32(pg, sum, factor);
+                svfloat32_t sum = svadd_f32_x(pg, va, vb);
+                sum = svmul_n_f32_x(pg, sum, factor);
                 // quantize
                 size_t start = (i << 1) + 1;
                 // i = k / 2;
@@ -932,8 +933,23 @@ namespace SZ3 {
                     }
 
                     svfloat32_t ori_sve = svld1(pg, ori);
-                    svfloat32_t quant_sve = svsub_f32(pg, ori_sve, sum); // prediction error
+                    svfloat32_t quant_sve = svsub_f32_x(pg, ori_sve, sum); // prediction error
 
+                    svfloat64_t quant_even_f64 = svcvt_f64_f32_x(svuzp1_f32(quant_sve, quant_sve));
+                    svfloat64_t quant_odd_f64  = svcvt_f64_f32_x(svuzp2_f32(quant_sve, quant_sve));
+
+                    quant_even_f64 = svmul_n_f64_x(pg64, quant_even_f64, ebx2_r_avx);
+                    quant_odd_f64  = svmul_n_f64_x(pg64, quant_odd_f64, ebx2_r_avx);
+
+                    svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_even_f64, -radius); // val > -radius
+                    svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_even_f64,  radius); // val < +radius
+                    svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);  
+                    quant_even_f64 = svsel_f64(pg_in_range, quant_even_f64, svdup_n_f64(0.0));
+
+                    svbool_t pg_gt_neg_o = svcmpgt_n_f64(pg64, quant_odd_f64, -radius);
+                    svbool_t pg_lt_pos_o = svcmplt_n_f64(pg64, quant_odd_f64,  radius);
+                    svbool_t pg_in_range_o = svand_b_z(pg64, pg_gt_neg_o, pg_lt_pos_o);
+                    quant_odd_f64 = svsel_f64(pg_in_range_o, quant_odd_f64, svdup_n_f64(0.0));
                     // __m256 ori_avx = _mm256_loadu_ps(ori);
                     // __m256 quant_avx = _mm256_sub_ps(ori_avx, sum); // prediction error
                     // float tmp[8];

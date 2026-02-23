@@ -18,6 +18,10 @@
 #include <immintrin.h>
 #endif
 
+#elif defined(__ARM_FEATURE_SVE2) 
+#include <arm_sve.h>
+#endif
+
 namespace SZ3 {
 template <TUNING Tuning, class T, uint N, class Quantizer>
 class InterpolationDecomposition : public concepts::DecompositionInterface<T, int, N> {
