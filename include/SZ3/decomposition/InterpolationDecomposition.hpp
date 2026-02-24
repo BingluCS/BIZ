@@ -252,6 +252,7 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
                 interp_level = max_interpolation_level;
             }
         }
+        radius = quantizer.get_out_range().second >> 1;
 #ifdef __AVX2__
         radius_avx = _mm256_set1_pd(radius);
         nradius_avx = _mm256_set1_pd(-radius);
@@ -1261,8 +1262,8 @@ template <COMPMODE CompMode, class QuantizeFunc>
     double interpolation(T *data, std::array<size_t, N> begin, std::array<size_t, N> end,
                          const std::string &interp_func, QuantizeFunc &&quantize_func, const int direction,
                          size_t stride = 1) {
-#ifdef __AVX2__
         std::tie(real_eb, real_ebx2, real_ebx2_r) = quantizer.get_all_eb();
+#ifdef __AVX2__
         ebx2_r_avx = _mm256_set1_pd(real_ebx2_r);
         ebx2_avx = _mm256_set1_pd(real_ebx2);
         if constexpr (std::is_same_v<T, float>) {
