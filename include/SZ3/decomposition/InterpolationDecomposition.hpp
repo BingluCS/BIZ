@@ -518,7 +518,20 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
     ALWAYS_INLINE void quantize_double (__m256d sum, size_t& start, T*& data, size_t& offset, size_t& len);
 
 #endif
+#ifdef __ARM_FEATURE_SVE2
+    template<typename U = T, typename = std::enable_if_t<std::is_same_v<U, float>>>
+    ALWAYS_INLINE void quantize_1D_float (svfloat32_t& sum, svfloat32_t& ori_avx, svfloat32_t& quant_avx, T* tmp);
+    
+    // template<typename U = T, typename = std::enable_if_t<std::is_same_v<U, double>>>
+    // ALWAYS_INLINE void quantize_1D_double (__m256d& sum, __m256d& ori_avx, __m256d& quant_avx, T tmp[4]);
 
+    // template <COMPMODE CompMode, int step, typename U = T, typename = std::enable_if_t<std::is_same_v<U, float>>>
+    // ALWAYS_INLINE void quantize_float (__m256 sum, size_t& start, T*& data, size_t& offset, size_t& len);
+
+    // template <COMPMODE CompMode, int step, typename U = T, typename = std::enable_if_t<std::is_same_v<U, double>>>
+    // ALWAYS_INLINE void quantize_double (__m256d sum, size_t& start, T*& data, size_t& offset, size_t& len);
+
+#endif
     template <COMPMODE CompMode, class QuantizeFunc>
     double interpolation_1d_simd_2d_x(T *data, const std::array<size_t, N> &begin_idx,
                                               const std::array<size_t, N> &end_idx, const size_t &direction,
