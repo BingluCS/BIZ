@@ -1014,12 +1014,12 @@ namespace SZ3 {
                     T tmp[step];
                     int quant_vals[step];
 
-                    quant_sve = svround_f64_x(pg64, svmul_n_f64_x(pg64, quant_sve, real_ebx2_r));
+                    quant_sve = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_sve, real_ebx2_r));
 
-                    svbool_t pg_gt_neg_o = svcmpgt_n_f64(pg64, quant_sve, -radius);
-                    svbool_t pg_lt_pos_o = svcmplt_n_f64(pg64, quant_sve,  radius);
-                    svbool_t pg_in_range_o = svand_b_z(pg64, pg_gt_neg_o, pg_lt_pos_o);
-                    quant_sve = svsel_f64(pg_in_range_o, quant_sve, svdup_n_f64(0.0));
+                    svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_sve, -radius);
+                    svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_sve,  radius);
+                    svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
+                    quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
 
                     svfloat64_t decompressed = svmla_f64_x(pg64, sum,
                     quant_sve, svdup_f64(real_ebx2));
@@ -1030,7 +1030,7 @@ namespace SZ3 {
                     pg_in_range = svand_b_z(pg, svcmpge_n_f64(pg, err_dequan, -real_eb), svcmple_n_f64(pg, err_dequan, real_eb));
                     quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
                     
-                    svint32_t quant_sve_i = svinterpret_s32_s64(svcvt_s64_f64_x(pg64, vec_f64));
+                    svint32_t quant_sve_i = svinterpret_s32_s64(svcvt_s64_f64_x(pg64, quant_sve));
                     quant_sve_i = svuzp1_32(quant_sve_i, quant_sve_i);
                     svint32_t result_s32 = svreinterpret_s32_s64(tmp_s64);
                     svst1_s32(pg_store, quant_vals, quant_sve_i);
@@ -1067,7 +1067,7 @@ namespace SZ3 {
                 //             data[(start + (j << 1)) * offset] = quantizer.recover_unpred();
                 //     }
                 //     quant_index += j;  
-                // }
+                }
 
             }
         }
