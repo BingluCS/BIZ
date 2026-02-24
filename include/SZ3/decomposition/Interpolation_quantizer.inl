@@ -942,7 +942,7 @@ namespace SZ3 {
                     T tmp[step];
                     int quant_vals[step];
 
-                    quantize_1D_float (sum, ori_sve, quant_sve, tmp);
+                    quantize_1D_float (sum, ori_sve, quant_sve, tmp, pg, pg64);
 
                     svint32_t quant_sve_i = svcvt_s32_f32_z(pg, quant_sve);
                     svst1(pg, quant_vals, quant_sve_i);
@@ -1202,7 +1202,7 @@ namespace SZ3 {
     template <TUNING Tuning, class T, uint N, class Quantizer>
     template<typename U, typename>
     ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::quantize_1D_float (
-        svfloat32_t& sum, svfloat32_t& ori_avx, svfloat32_t& quant_avx, T* tmp) {
+        svfloat32_t& sum, svfloat32_t& ori_avx, svfloat32_t& quant_avx, T* tmp, svbool_t& pg, svbool_t& pg64) {
             
             svfloat64_t quant_even_f64 = svcvt_f64_f32_x(pg64, quant_sve);
             svfloat64_t quant_odd_f64  = svcvt_f64_f32_x(pg64, svreinterpret_f32(svlsr_x(pg64, svreinterpret_u64(quant_sve), 32)));
