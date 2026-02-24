@@ -903,13 +903,7 @@ namespace SZ3 {
         auto odd_len = len / 2;
         auto even_len = len - odd_len;
         size_t i = 0;
-        if constexpr (CompMode == COMPMODE::DECOMP) {
-            for (; i + 1  < even_len; ++i) {
-                size_t start = ((i << 1) + 1) * offset;
-                quantize_func(cur_ij_offset + start,  data[start], interp_linear(buf[i], buf[i + 1]));
-            }
-        }
-        else if constexpr (std::is_same_v<T, float>) {
+        if constexpr (std::is_same_v<T, float>) {
             // const size_t step = AVX_256_parallelism;
             const size_t step = 16;
             svbool_t pg = svptrue_b32();
@@ -960,33 +954,34 @@ namespace SZ3 {
                     quant_index += j;
                 }
                 else if constexpr (CompMode == COMPMODE::DECOMP) { // decomp
-                    // __m256i quant_avx_i = _mm256_loadu_si256(
-                    //     reinterpret_cast<__m256i*>(quant_inds + quant_index));
-                    // int quant_vals[8];
-                    // _mm256_storeu_si256(reinterpret_cast<__m256i*>(quant_vals), quant_avx_i);
-                    // quant_avx_i = _mm256_sub_epi32(quant_avx_i, radius_avx_256i);
+                    svint32_t quant_sve_i = svld1_s32(pg, quant_inds + quant_index);
+                    int quant_vals[step];
+                    svst1(pg, quant_vals, quant_sve_i);
+                    quant_sve_i = svsub_n_s32_x(pg, quant_sve_i, radius);
                     
-                    // __m256d decompressed_low  = _mm256_cvtepi32_pd(_mm256_castsi256_si128(quant_avx_i));
-                    // decompressed_low = _mm256_mul_pd(decompressed_low, ebx2_avx);
+                    svfloat64_t decompressed_even_f64 = svcvt_f64_f32_x(pg64, quant_sve_i);
+                    svfloat64_t decompressed_odd_f64  = svcvt_f64_f32_x(pg64, 
+                        svreinterpret_f32(svlsr_x(pg64, svreinterpret_u64(quant_sve_i), 32)));
                     
-                    // __m256d decompressed_high = _mm256_cvtepi32_pd(_mm256_extracti128_si256(quant_avx_i, 1));
-                    // decompressed_high = _mm256_mul_pd(decompressed_high, ebx2_avx);
+                    decompressed_even_f64 = svmul_n_f64_x(pg64, decompressed_even_f64, real_ebx2);
+                    decompressed_odd_f64 = svmul_n_f64_x(pg64, decompressed_odd_f64, real_ebx2);
 
-                    //  __m256 decompressed = _mm256_insertf128_ps(
-                    //     _mm256_castps128_ps256(_mm256_cvtpd_ps(decompressed_low)),
-                    //     _mm256_cvtpd_ps(decompressed_high), 1);
-                    // decompressed = _mm256_add_ps(decompressed, sum);
-                    // float tmp[8];
-                    // _mm256_storeu_ps(tmp, decompressed);
+                    svfloat32_t even_f32 = svcvt_f32_f64_x(pg64, decompressed_even_f64);
+                    svfloat32_t odd_f32  = svcvt_f32_f64_x(pg64, decompressed_odd_f64);
+                    svfloat32_t decompressed  = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
+                    decompressed = svadd_f32_x(pg, decompressed, sum);
+
+                    float tmp[8];
+                    _mm256_storeu_ps(tmp, decompressed);
                     
-                    // size_t j = 0;
-                    // for ( ; j < step && i + j + 1< odd_len; ++j) {
-                    //     if (quant_vals[j] != 0) 
-                    //         data[(start + (j << 1)) * offset] = tmp[j];
-                    //     else 
-                    //         data[(start + (j << 1)) * offset] = quantizer.recover_unpred();
-                    // }
-                    // quant_index += j;
+                    size_t j = 0;
+                    for ( ; j < step && i + j + 1< odd_len; ++j) {
+                        if (quant_vals[j] != 0) 
+                            data[(start + (j << 1)) * offset] = tmp[j];
+                        else 
+                            data[(start + (j << 1)) * offset] = quantizer.recover_unpred();
+                    }
+                    quant_index += j;
                 }
             }
         }
@@ -1202,7 +1197,7 @@ namespace SZ3 {
     template <TUNING Tuning, class T, uint N, class Quantizer>
     template<typename U, typename>
     ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::quantize_1D_float (
-        svfloat32_t& sum, svfloat32_t& ori_avx, svfloat32_t& quant_avx, T* tmp, svbool_t& pg, svbool_t& pg64) {
+        svfloat32_t& sum, svfloat32_t& ori_sve, svfloat32_t& quant_sve, T* tmp, svbool_t& pg, svbool_t& pg64) {
             
             svfloat64_t quant_even_f64 = svcvt_f64_f32_x(pg64, quant_sve);
             svfloat64_t quant_odd_f64  = svcvt_f64_f32_x(pg64, svreinterpret_f32(svlsr_x(pg64, svreinterpret_u64(quant_sve), 32)));
