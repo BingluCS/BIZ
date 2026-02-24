@@ -359,6 +359,7 @@ namespace SZ3 {
                 }
             }
         }
+
         if(odd_len > 1){
             if(odd_len < even_len){//the only boundary is p[len- 1] 
                 //odd_len < even_len so even_len > 2
@@ -959,9 +960,9 @@ namespace SZ3 {
                     svst1(pg, quant_vals, quant_sve_i);
                     quant_sve_i = svsub_n_s32_x(pg, quant_sve_i, radius);
                     
-                    svfloat64_t decompressed_even_f64 = svcvt_f64_f32_x(pg64, quant_sve_i);
-                    svfloat64_t decompressed_odd_f64  = svcvt_f64_f32_x(pg64, 
-                        svreinterpret_f32(svlsr_x(pg64, svreinterpret_u64(quant_sve_i), 32)));
+                    svfloat64_t decompressed_even_f64 = svcvt_f64_s32_x(pg64, quant_sve_i);
+                    svfloat64_t decompressed_odd_f64  = svcvt_f64_s32_x(pg64, 
+                        svreinterpret_s32(svlsr_x(pg64, svreinterpret_u64(quant_sve_i), 32)));
                     
                     decompressed_even_f64 = svmul_n_f64_x(pg64, decompressed_even_f64, real_ebx2);
                     decompressed_odd_f64 = svmul_n_f64_x(pg64, decompressed_odd_f64, real_ebx2);
@@ -971,8 +972,8 @@ namespace SZ3 {
                     svfloat32_t decompressed  = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
                     decompressed = svadd_f32_x(pg, decompressed, sum);
 
-                    float tmp[8];
-                    _mm256_storeu_ps(tmp, decompressed);
+                    T tmp[step];
+                    svst1_f32(pg, tmp, decompressed);
                     
                     size_t j = 0;
                     for ( ; j < step && i + j + 1< odd_len; ++j) {
@@ -1090,9 +1091,99 @@ namespace SZ3 {
         quantize_func(cur_ij_offset + offset , data[offset], pred_first);
 
         size_t i = 0;
-        for (; i + 3  < even_len; ++i) {
-            size_t start = ((i << 1) + 3) * offset;
-            quantize_func(cur_ij_offset + start,  data[start], interp_cubic(buf[i], buf[i + 1], buf[i + 2], buf[i + 3]));
+        if constexpr (std::is_same_v<T, float>) {
+            const size_t step = 16;
+
+            for (; i + 3  < even_len; i += step) { // 3 is not AVX_256_parallelism - 1 !!
+                __m256 va = _mm256_loadu_ps(buf + i);
+                __m256 vb = _mm256_loadu_ps(buf + i + 1);
+                __m256 vc = _mm256_loadu_ps(buf + i + 2);
+                __m256 vd = _mm256_loadu_ps(buf + i + 3);
+
+                 __m256 sum = _mm256_add_ps(vb, vc); 
+                 sum = _mm256_mul_ps(sum, nine); 
+                 sum = _mm256_sub_ps(sum, va); 
+                sum = _mm256_sub_ps(sum, vd);                       
+                sum = _mm256_mul_ps(sum, factor);        
+
+                svfloat32_t va = svld1(pg, &buf[i]);
+                svfloat32_t vb = svld1(pg, &buf[i + 1]);
+                svfloat32_t vc = svld1(pg, &buf[i + 2]);
+                svfloat32_t vd = svld1(pg, &buf[i + 3]);
+                svfloat32_t sum = svadd_f32_x(pg, vb, vc);
+                sum = svmul_n_f32_x(pg, sum, 9.0f);
+                sum = svsub_f32_x(pg, sum, va);
+                sum = svsub_f32_x(pg, sum, vd);
+                sum = svmul_n_f32_x(pg, sum, 0.0625f);
+
+                size_t start = (i << 1) + 3;
+
+                if constexpr (CompMode == COMPMODE::COMP) {
+                     T ori[step];
+                    size_t base = start * offset;
+                    size_t offsetx2 = offset << 1;
+
+                    #pragma unroll
+                    for (size_t j = 0; j < step; ++j) {
+                        ori[j] = data[base + j * offsetx2];
+                    }
+
+                    svfloat32_t ori_sve = svld1(pg, ori);
+                    svfloat32_t quant_sve = svsub_f32_x(pg, ori_sve, sum); // prediction error
+                    T tmp[step];
+                    int quant_vals[step];
+
+                    quantize_1D_float (sum, ori_sve, quant_sve, tmp, pg, pg64);
+
+                    svint32_t quant_sve_i = svcvt_s32_f32_z(pg, quant_sve);
+                    svst1(pg, quant_vals, quant_sve_i);
+
+                    size_t j = 0;
+                    #pragma unroll
+                    for ( ; j < step && i + j + 1 < odd_len; ++j) {
+                        if (quant_vals[j] != 0)
+                            data[(start + (j << 1)) * offset] = tmp[j];
+                        else
+                            quantizer.force_save_unpred(ori[j]);
+                        ++frequency[quant_vals[j]];
+                    }
+                    svst1(pg, quant_inds + quant_index, quant_sve_i);
+                    quant_index += j;
+                }
+                else if constexpr (CompMode == COMPMODE::DECOMP) { // decomp
+                    svint32_t quant_sve_i = svld1_s32(pg, quant_inds + quant_index);
+                    int quant_vals[step];
+                    svst1(pg, quant_vals, quant_sve_i);
+                    quant_sve_i = svsub_n_s32_x(pg, quant_sve_i, radius);
+                    
+                    svfloat64_t decompressed_even_f64 = svcvt_f64_s32_x(pg64, quant_sve_i);
+                    svfloat64_t decompressed_odd_f64  = svcvt_f64_s32_x(pg64, 
+                        svreinterpret_s32(svlsr_x(pg64, svreinterpret_u64(quant_sve_i), 32)));
+                    
+                    decompressed_even_f64 = svmul_n_f64_x(pg64, decompressed_even_f64, real_ebx2);
+                    decompressed_odd_f64 = svmul_n_f64_x(pg64, decompressed_odd_f64, real_ebx2);
+
+                    svfloat32_t even_f32 = svcvt_f32_f64_x(pg64, decompressed_even_f64);
+                    svfloat32_t odd_f32  = svcvt_f32_f64_x(pg64, decompressed_odd_f64);
+                    svfloat32_t decompressed  = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
+                    decompressed = svadd_f32_x(pg, decompressed, sum);
+
+                    T tmp[step];
+                    svst1_f32(pg, tmp, decompressed);
+                    
+                    size_t j = 0;
+                    for ( ; j < step && i + j + 1< odd_len; ++j) {
+                        if (quant_vals[j] != 0) 
+                            data[(start + (j << 1)) * offset] = tmp[j];
+                        else 
+                            data[(start + (j << 1)) * offset] = quantizer.recover_unpred();
+                    }
+                    quant_index += j;
+                }
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>) {
+            
         }
         
         if(odd_len > 1){
