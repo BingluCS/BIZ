@@ -1165,7 +1165,77 @@ namespace SZ3 {
             }
         }
         else if constexpr (std::is_same_v<T, double>) {
+            const size_t step = 8;
+            svbool_t pg64 = svptrue_b64();
             
+            for (; i + 3 < even_len; i += step) { // 3 is not AVX_256_parallelism - 1 !!
+
+                svfloat64_t va = svld1(pg64, &buf[i]);
+                svfloat64_t vb = svld1(pg64, &buf[i + 1]);
+                svfloat64_t vc = svld1(pg64, &buf[i + 2]);
+                
+                svfloat64_t sum = svadd_f64_x(pg64, vb, vc);
+                sum = svmul_n_f64_x(pg64, sum, 9.0);
+
+                svfloat64_t vd = svld1(pg64, &buf[i + 3]);
+                sum = svsub_f64_x(pg64, sum, va);
+                sum = svsub_f64_x(pg64, sum, vd);
+                sum = svmul_n_f64_x(pg64, sum, 0.0625);
+
+                size_t start = (i << 1) + 3;
+                if constexpr (CompMode == COMPMODE::COMP) {
+                    T ori[step];
+                    size_t base = start * offset;
+                    size_t offsetx2 = offset << 1;
+
+                    #pragma unroll
+                    for (size_t j = 0; j < step; ++j) {
+                        ori[j] = data[base + j * offsetx2];
+                    }
+
+                    svfloat64_t ori_sve = svld1(pg64, ori);
+                    svfloat64_t quant_sve = svsub_f64_x(pg64, ori_sve, sum); // prediction error
+                    T tmp[step];
+                    int quant_vals[step];
+                    quantize_1D_double(sum, ori_sve, quant_sve, tmp, pg64);
+                    
+                    svint64_t quant_sve_i = svcvt_s64_f64_x(pg64, quant_sve);
+                    
+                    svst1w_s64(pg64, quant_vals, quant_sve_i);
+
+                    size_t j = 0;
+                    #pragma unroll
+                    for ( ; j < step && i + j + 3 < odd_len; ++j) {
+                        if (quant_vals[j] != 0)
+                            data[(start + (j << 1)) * offset] = tmp[j];
+                        else
+                            quantizer.force_save_unpred(ori[j]);
+                        ++frequency[quant_vals[j]];
+                    }
+                    svst1w_s64(pg64, quant_inds + quant_index, quant_sve_i);
+                    quant_index += j;
+                }
+                else if constexpr (CompMode == COMPMODE::DECOMP) { // decomp
+                    svint64_t quant_sve_i = svld1sw_s64(pg64, quant_inds + quant_index);
+                    int quant_vals[step];
+                    svst1w_s64(pg64, quant_vals, quant_sve_i);
+                    quant_sve_i = svsub_n_s64_x(pg64, quant_sve_i, radius);
+
+                    svfloat64_t decompressed = svmla_f64_x(pg64, sum, 
+                            svcvt_f64_s64_x(pg64, quant_sve_i), svdup_f64(real_ebx2));
+                    T tmp[step];
+                    svst1_f64(pg64, tmp, decompressed);
+                    size_t j = 0;
+                    for ( ; j < step && i + j + 3 < odd_len; ++j) {
+                        if (quant_vals[j] != 0) 
+                            data[(start + (j << 1)) * offset] = tmp[j];
+                        else
+                            data[(start + (j << 1)) * offset] = quantizer.recover_unpred();
+                    }
+                    quant_index += j;  
+                }
+
+            }
         }
         
         if(odd_len > 1){
