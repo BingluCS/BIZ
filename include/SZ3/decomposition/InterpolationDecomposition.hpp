@@ -533,6 +533,9 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
     ALWAYS_INLINE void quantize_1D_float (svfloat32_t& sum, svfloat32_t& ori_sve, svfloat32_t& quant_sve, T* tmp, 
         svbool_t& pg, svbool_t& pg64);
     
+    template<typename U = T, typename = std::enable_if_t<std::is_same_v<U, float>>>
+    ALWAYS_INLINE void quantize_1D_double (svfloat64_t& sum, svfloat64_t& ori_sve, svfloat64_t& quant_sve, T* tmp, 
+        svbool_t& pg64);
     // template<typename U = T, typename = std::enable_if_t<std::is_same_v<U, double>>>
     // ALWAYS_INLINE void quantize_1D_double (__m256d& sum, __m256d& ori_avx, __m256d& quant_avx, T tmp[4]);
 
