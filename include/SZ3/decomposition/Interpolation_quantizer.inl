@@ -1286,6 +1286,7 @@ namespace SZ3 {
                 
                 // _mm256_storeu_ps(p + i, sum);
                 quantize_float<CompMode>(sum, i, data, offset, len, step, pg, pg64);
+            }
         }
         else if constexpr (std::is_same_v<T, double>) {
             // constexpr size_t step = AVX_256_parallelism;
@@ -1310,9 +1311,42 @@ namespace SZ3 {
         size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
 
         size_t i = 0;
-        for (; i < len; ++i) {
-            size_t start = i * offset;
-            quantize_func(cur_ij_offset + start,  data[start], interp_cubic(a[i], b[i], c[i], d[i]));
+        if constexpr (std::is_same_v<T, float>) {
+            const size_t step = 16;
+            svbool_t pg = svptrue_b32();
+            svbool_t pg64 = svptrue_b64();
+
+            for (; i  < len; i += step) {
+                svfloat32_t va = svld1(pg, &a[i]);
+                svfloat32_t vb = svld1(pg, &b[i]);
+                svfloat32_t vc = svld1(pg, &c[i]);
+                
+                svfloat32_t sum = svadd_f32_x(pg, vb, vc);
+                sum = svmul_n_f32_x(pg, sum, 9.0f);
+
+                svfloat32_t vd = svld1(pg, &d[i]);
+                sum = svsub_f32_x(pg, sum, va);
+                sum = svsub_f32_x(pg, sum, vd);
+                sum = svmul_n_f32_x(pg, sum, 0.0625f);
+                
+                // _mm256_storeu_ps(p + i, sum);
+                quantize_float<CompMode>(sum, i, data, offset, len, step, pg, pg64);
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>) {
+            // constexpr size_t step = AVX_256_parallelism;
+            // const __m256d factor = _mm256_set1_pd(0.5);
+
+            // for (; i  < len; i += step) {
+            //     __m256d va = _mm256_loadu_pd(a + i);
+            //     __m256d vb = _mm256_loadu_pd(b + i);
+
+            //     __m256d sum = _mm256_add_pd(va, vb);                       
+            //     sum = _mm256_mul_pd(sum, factor);    
+            //     // _mm256_storeu_pd(p + i, sum);
+            //     // size_t start = i;
+            //     quantize_double<CompMode, step>(sum, i, data, offset, len);
+            // }
         }
     }
     
@@ -1320,11 +1354,32 @@ namespace SZ3 {
     template <COMPMODE CompMode, class QuantizeFunc>
     ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_equal_and_quantize(const T * a, size_t &len, T* data, 
         size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
-
         size_t i = 0;
-        for (; i < len; ++i) {
-            size_t start = i * offset;
-            quantize_func(cur_ij_offset + start,  data[start], a[i]);
+        if constexpr (std::is_same_v<T, float>) {
+            const size_t step = 16;
+            svbool_t pg = svptrue_b32();
+            svbool_t pg64 = svptrue_b64();
+
+            for (; i  < len; i += step) {
+                svfloat32_t sum = svld1(pg, &a[i]);                
+                // _mm256_storeu_ps(p + i, sum);
+                quantize_float<CompMode>(sum, i, data, offset, len, step, pg, pg64);
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>) {
+            // constexpr size_t step = AVX_256_parallelism;
+            // const __m256d factor = _mm256_set1_pd(0.5);
+
+            // for (; i  < len; i += step) {
+            //     __m256d va = _mm256_loadu_pd(a + i);
+            //     __m256d vb = _mm256_loadu_pd(b + i);
+
+            //     __m256d sum = _mm256_add_pd(va, vb);                       
+            //     sum = _mm256_mul_pd(sum, factor);    
+            //     // _mm256_storeu_pd(p + i, sum);
+            //     // size_t start = i;
+            //     quantize_double<CompMode, step>(sum, i, data, offset, len);
+            // }
         }
     }
 
@@ -1333,10 +1388,35 @@ namespace SZ3 {
     ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::interp_linear1_and_quantize(const T * a, const T* b, size_t &len, T* data, 
         size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
   
-        size_t i = 0;
-        for (; i < len; ++i) {
-            size_t start = i * offset;
-            quantize_func(cur_ij_offset + start,  data[start], interp_linear1(a[i], b[i]));
+       size_t i = 0;
+        if constexpr (std::is_same_v<T, float>) {
+            const size_t step = 16;
+            svbool_t pg = svptrue_b32();
+            svbool_t pg64 = svptrue_b64();
+
+            for (; i  < len; i += step) {
+                svfloat32_t va = svld1(pg, &a[i]);  
+                svfloat32_t vb = svld1(pg, &b[i]);
+                vb = svmul_n_f32_x(pg, vb, 1.5f);
+                svfloat32_t sum = svmls_f32_x(pg, vb, va, svdup_n_f32(0.5f));
+                // _mm256_storeu_ps(p + i, sum);
+                quantize_float<CompMode>(sum, i, data, offset, len, step, pg, pg64);
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>) {
+            // constexpr size_t step = AVX_256_parallelism;
+            // const __m256d factor = _mm256_set1_pd(0.5);
+
+            // for (; i  < len; i += step) {
+            //     __m256d va = _mm256_loadu_pd(a + i);
+            //     __m256d vb = _mm256_loadu_pd(b + i);
+
+            //     __m256d sum = _mm256_add_pd(va, vb);                       
+            //     sum = _mm256_mul_pd(sum, factor);    
+            //     // _mm256_storeu_pd(p + i, sum);
+            //     // size_t start = i;
+            //     quantize_double<CompMode, step>(sum, i, data, offset, len);
+            // }
         }
     }
 
@@ -1435,8 +1515,8 @@ namespace SZ3 {
 
     template <TUNING Tuning, class T, uint N, class Quantizer>
     template <COMPMODE CompMode, typename U, typename>
-    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::quantize_float (__m256 sum, size_t& start, T*& data, size_t& offset, 
-        size_t& len, int& step, svbool_t& pg, svbool_t& pg64) {
+    ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::quantize_float (svfloat32_t& sum, size_t& start, T*& data, size_t& offset, 
+        size_t& len, const size_t& step, svbool_t& pg, svbool_t& pg64) {
         if constexpr (CompMode == COMPMODE::COMP) {
             T ori[step];
             size_t base = start * offset;
