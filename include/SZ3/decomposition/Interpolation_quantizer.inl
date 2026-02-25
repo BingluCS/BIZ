@@ -961,15 +961,13 @@ namespace SZ3 {
                     quant_sve_i = svsub_n_s32_x(pg, quant_sve_i, radius);
                     
                     svfloat64_t decompressed_even_f64 = svcvt_f64_s32_x(pg64, quant_sve_i);
-                    svfloat64_t decompressed_odd_f64  = svcvt_f64_s32_x(pg64, 
-                        svreinterpret_s32(svlsr_x(pg64, svreinterpret_u64(quant_sve_i), 32)));
+                    svfloat64_t decompressed_odd_f64  = svcvtlt_f64_f32_x(pg64, quant_sve_i);
                     
                     decompressed_even_f64 = svmul_n_f64_x(pg64, decompressed_even_f64, real_ebx2);
                     decompressed_odd_f64 = svmul_n_f64_x(pg64, decompressed_odd_f64, real_ebx2);
-
-                    svfloat32_t even_f32 = svcvt_f32_f64_x(pg64, decompressed_even_f64);
-                    svfloat32_t odd_f32  = svcvt_f32_f64_x(pg64, decompressed_odd_f64);
-                    svfloat32_t decompressed  = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
+                    
+                    svfloat32_t decompressed  = svadd_f32_x(pg, svcvt_f32_f64_z(pg64, decompressed_even_f64),
+                 svcvtlt_f32_f64_z(pg64, decompressed_odd_f64));
                     decompressed = svadd_f32_x(pg, decompressed, sum);
 
                     T tmp[step];
@@ -1053,7 +1051,7 @@ namespace SZ3 {
                     quant_sve_i = svsub_n_s32_x(pg_store, quant_sve_i, radius);
 
                     svfloat64_t decompressed = svmla_f64_x(pg64, sum, 
-                            svcvt_f64_s64_x(svunpklo_s64(quant_sve_i)), svdup_f64(real_ebx2));
+                            svcvt_f64_s64_x(pg64, svunpklo_s64(quant_sve_i)), svdup_f64(real_ebx2));
                     T tmp[step];
                     svst1_f64(pg64, tmp, decompressed);
                     size_t j = 0;
@@ -1317,7 +1315,7 @@ namespace SZ3 {
         svfloat32_t& sum, svfloat32_t& ori_sve, svfloat32_t& quant_sve, T* tmp, svbool_t& pg, svbool_t& pg64) {
             
             svfloat64_t quant_even_f64 = svcvt_f64_f32_x(pg64, quant_sve);
-            svfloat64_t quant_odd_f64  = svcvt_f64_f32_x(pg64, svreinterpret_f32(svlsr_x(pg64, svreinterpret_u64(quant_sve), 32)));
+            svfloat64_t quant_odd_f64  = svcvtlt_f64_f32_x(pg64, quant_sve);
             quant_even_f64 = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_even_f64, real_ebx2_r));
             quant_odd_f64  = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_odd_f64, real_ebx2_r));
 
@@ -1335,17 +1333,22 @@ namespace SZ3 {
 
             svfloat64_t decompressed_even_f64 = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, sum),
                     quant_even_f64, svdup_f64(real_ebx2));
-            svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, svreinterpret_f32(svlsr_x(pg64, svreinterpret_u64(sum), 32))),
+            svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svcvtlt_f64_f32_x(pg64, sum),
                     quant_odd_f64, svdup_f64(real_ebx2));
 
-            svfloat32_t even_f32 = svcvt_f32_f64_x(pg64, decompressed_even_f64);
-            svfloat32_t odd_f32  = svcvt_f32_f64_x(pg64, decompressed_odd_f64);
-            svfloat32_t decompressed  = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
+            // svfloat32_t even_f32 = svcvt_f32_f64_x(pg64, decompressed_even_f64);
+            // svfloat32_t odd_f32  = svcvtlt_f32_f64_x(pg64, decompressed_odd_f64);
+            svfloat32_t decompressed = svadd_f32_x(pg, svcvt_f32_f64_z(pg64, decompressed_even_f64),
+                 svcvtlt_f32_f64_z(pg64, decompressed_odd_f64));
+            
             svst1_f32(pg, tmp, decompressed);
 
-            even_f32 = svcvt_f32_f64_x(pg64, quant_even_f64);
-            odd_f32  = svcvt_f32_f64_x(pg64, quant_odd_f64);
-            quant_sve = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
+            // even_f32 = svcvt_f32_f64_x(pg64, quant_even_f64);
+            // odd_f32  = svcvt_f32_f64_x(pg64, quant_odd_f64);
+            // quant_sve = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
+
+            quant_sve = svadd_f32_x(pg, svcvt_f32_f64_z(pg64, quant_even_f64),
+                 svcvtlt_f32_f64_z(pg64, quant_odd_f64));
 
             svfloat32_t err_dequan = svsub_f32_x(pg, decompressed, ori_sve);
             quant_sve = svadd_n_f32_x(pg, quant_sve, radius);
