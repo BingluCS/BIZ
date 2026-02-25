@@ -1318,7 +1318,7 @@ namespace SZ3 {
     template <TUNING Tuning, class T, uint N, class Quantizer>
     template<typename U, typename>
     ALWAYS_INLINE void InterpolationDecomposition<Tuning, T, N, Quantizer>::quantize_1D_double (
-        svfloat32_t& sum, svfloat32_t& ori_sve, svfloat32_t& quant_sve, T* tmp, svbool_t& pg64) {
+        svfloat64_t& sum, svfloat64_t& ori_sve, svfloat64_t& quant_sve, T* tmp, svbool_t& pg64) {
             
         quant_sve = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_sve, real_ebx2_r));
 
