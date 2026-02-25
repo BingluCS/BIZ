@@ -1278,14 +1278,15 @@ namespace SZ3 {
             svbool_t pg64 = svptrue_b64();
 
             for (; i  < len; i += step) {
-                svfloat32_t va = svld1(pg, &buf[i]);
-                svfloat32_t vb = svld1(pg, &buf[i + 1]);
+                svfloat32_t va = svld1(pg, &a[i]);
+                svfloat32_t vb = svld1(pg, &b[i]);
 
                 svfloat32_t sum = svadd_f32_x(pg, va, vb);
                 sum = svmul_n_f32_x(pg, sum, 0.5f);   
                 
                 // _mm256_storeu_ps(p + i, sum);
                 // quantize_float<CompMode, step>(sum, i, data, offset, len);
+                size_t start = i;
                 if constexpr (CompMode == COMPMODE::COMP) {
                     T ori[step];
                     size_t base = start * offset;
