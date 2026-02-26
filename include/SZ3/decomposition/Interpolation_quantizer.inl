@@ -1284,7 +1284,6 @@ namespace SZ3 {
                 svfloat32_t sum = svadd_f32_x(pg, va, vb);
                 sum = svmul_n_f32_x(pg, sum, 0.5f);   
                 
-                // _mm256_storeu_ps(p + i, sum);
                 quantize_float<CompMode>(sum, i, data, offset, len, step, pg, pg64);
             }
         }
@@ -1325,6 +1324,7 @@ namespace SZ3 {
                 sum = svmul_n_f32_x(pg, sum, 9.0f);
 
                 svfloat32_t vd = svld1(pg, &d[i]);
+                
                 sum = svsub_f32_x(pg, sum, va);
                 sum = svsub_f32_x(pg, sum, vd);
                 sum = svmul_n_f32_x(pg, sum, 0.0625f);
@@ -1437,7 +1437,7 @@ namespace SZ3 {
                 vb = svnmls_n_f32_x(pg, vc, vb, 6.0f);
                 svfloat32_t va = svld1(pg, &a[i]);  
                 svfloat32_t sum = svmla_n_f32_x(pg, vb, va, 3.0f);
-                sum = svmul_n_f32_x(pg, sum, 0.0625f);
+                sum = svmul_n_f32_x(pg, sum, 0.125f);
                 // _mm256_storeu_ps(p + i, sum);
                 quantize_float<CompMode>(sum, i, data, offset, len, step, pg, pg64);
             }
@@ -1476,7 +1476,7 @@ namespace SZ3 {
 
                 svfloat32_t vc = svld1(pg, &c[i]);
                 svfloat32_t sum = svmla_n_f32_x(pg, vb, vc, 3.0f);
-                sum = svmul_n_f32_x(pg, sum, 0.0625f);
+                sum = svmul_n_f32_x(pg, sum, 0.125f);
                 // _mm256_storeu_ps(p + i, sum);
                 quantize_float<CompMode>(sum, i, data, offset, len, step, pg, pg64);
             }
