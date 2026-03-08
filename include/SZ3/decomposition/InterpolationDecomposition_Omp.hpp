@@ -163,12 +163,12 @@ class InterpolationDecomposition_OMP : public concepts::DecompositionInterface_O
         interp_id = conf.interpAlgo;
         direction_sequence_id = conf.interpDirection;
         anchor_stride = conf.interpAnchorStride;
-        blocksize = 1024000;  // a empirical value. Can be very large but not helpful
+        // blocksize = 1024000;  // a empirical value. Can be very large but not helpful
         eb_alpha = conf.interpAlpha;
         eb_beta = conf.interpBeta;
 
         init();
-
+        blocksize = max_dim;
         auto default_nThreads = omp_get_max_threads();
         //std::cout<<"max threads: "<<default_nThreads<<std::endl;
 

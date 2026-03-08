@@ -109,11 +109,12 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
         interp_id = conf.interpAlgo;
         direction_sequence_id = conf.interpDirection;
         anchor_stride = conf.interpAnchorStride;
-        blocksize = 102400;  // a empirical value. Can be very large but not helpful
+        //blocksize = 102400;  // a empirical value. Can be very large but not helpful
         eb_alpha = conf.interpAlpha;
         eb_beta = conf.interpBeta;
 
         init();
+        blocksize = max_dim;
 #ifdef __ARM_FEATURE_SVE2
         int SVE2_parallelism = svcntb() / sizeof(T);
         auto buffer_len = max_dim +  2 * SVE2_parallelism - max_dim % SVE2_parallelism;
