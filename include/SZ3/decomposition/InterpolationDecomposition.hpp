@@ -35,7 +35,6 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
     T *decompress(const Config &conf, int* quant_inds_vec, T *dec_data) override {
         init();
 #ifdef __ARM_FEATURE_SVE2
-        int SVE2_parallelism = svcntb() / sizeof(T);
         auto buffer_len = max_dim +  2 * SVE2_parallelism - max_dim % SVE2_parallelism;
 #else
         auto buffer_len = max_dim +  2 * AVX_256_parallelism - max_dim % AVX_256_parallelism;
@@ -116,7 +115,6 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
         init();
         blocksize = max_dim;
 #ifdef __ARM_FEATURE_SVE2
-        int SVE2_parallelism = svcntb() / sizeof(T);
         auto buffer_len = max_dim +  2 * SVE2_parallelism - max_dim % SVE2_parallelism;
 #else
         auto buffer_len = max_dim +  2 * AVX_256_parallelism - max_dim % AVX_256_parallelism;
@@ -278,6 +276,11 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
         else if constexpr (std::is_same_v<T, double>) {
             radius_avx_128i = _mm_set1_epi32(radius);
         }
+#endif
+#ifdef __ARM_FEATURE_SVE2
+        SVE2_parallelism = svcntb() / sizeof(T);
+        pg = svptrue_b32();
+        pg64 = svptrue_b64();
 #endif
         original_dim_offsets[N - 1] = 1;
         for (int i = N - 2; i >= 0; i--) {
@@ -1459,6 +1462,11 @@ template <COMPMODE CompMode, class QuantizeFunc>
     __m256d rel_eb_avx_d;
     __m256d nrel_eb_avx_d;
     __m128i radius_avx_128i;
+#endif
+#ifdef __ARM_FEATURE_SVE2
+    int SVE2_parallelism;
+    svbool_t pg;
+    svbool_t pg64;
 #endif
     //std::vector<int> visited;
 };
