@@ -279,8 +279,6 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
 #endif
 #ifdef __ARM_FEATURE_SVE2
         SVE2_parallelism = svcntb() / sizeof(T);
-        pg = svptrue_b32();
-        pg64 = svptrue_b64();
 #endif
         original_dim_offsets[N - 1] = 1;
         for (int i = N - 2; i >= 0; i--) {

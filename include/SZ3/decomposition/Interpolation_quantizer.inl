@@ -1357,7 +1357,7 @@ namespace SZ3 {
         size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
         size_t i = 0;
         if constexpr (std::is_same_v<T, float>) {
-            const size_t step = 16;
+            const size_t step = SVE2_parallelism;
             svbool_t pg = svptrue_b32();
             svbool_t pg64 = svptrue_b64();
 
@@ -1368,23 +1368,13 @@ namespace SZ3 {
             }
         }
         else if constexpr (std::is_same_v<T, double>) {
-                    for (; i < len; ++i) {
-            size_t start = i * offset;
-            quantize_func(cur_ij_offset + start,  data[start], a[i]);
-        }
-            // constexpr size_t step = AVX_256_parallelism;
-            // const __m256d factor = _mm256_set1_pd(0.5);
+            const size_t step = SVE2_parallelism;
+            svbool_t pg64 = svptrue_b64();
 
-            // for (; i  < len; i += step) {
-            //     __m256d va = _mm256_loadu_pd(a + i);
-            //     __m256d vb = _mm256_loadu_pd(b + i);
-
-            //     __m256d sum = _mm256_add_pd(va, vb);                       
-            //     sum = _mm256_mul_pd(sum, factor);    
-            //     // _mm256_storeu_pd(p + i, sum);
-            //     // size_t start = i;
-            //     quantize_double<CompMode, step>(sum, i, data, offset, len);
-            // }
+            for (; i  < len; i += step) {
+                svfloat64_t sum = svld1(pg64, &a[i]);                
+                quantize_double<CompMode>(sum, i, data, offset, len, step, pg64);
+            }
         }
     }
 
@@ -1395,10 +1385,9 @@ namespace SZ3 {
   
         size_t i = 0;
         if constexpr (std::is_same_v<T, float>) {
-            const size_t step = 16;
+            const size_t step = SVE2_parallelism;
             svbool_t pg = svptrue_b32();
             svbool_t pg64 = svptrue_b64();
-
             for (; i  < len; i += step) {
                 svfloat32_t va = svld1(pg, &a[i]);  
                 svfloat32_t vb = svld1(pg, &b[i]);
@@ -1409,23 +1398,16 @@ namespace SZ3 {
             }
         }
         else if constexpr (std::is_same_v<T, double>) {
-                    for (; i < len; ++i) {
-            size_t start = i * offset;
-            quantize_func(cur_ij_offset + start,  data[start], interp_linear1(a[i], b[i]));
-        }
-            // constexpr size_t step = AVX_256_parallelism;
-            // const __m256d factor = _mm256_set1_pd(0.5);
-
-            // for (; i  < len; i += step) {
-            //     __m256d va = _mm256_loadu_pd(a + i);
-            //     __m256d vb = _mm256_loadu_pd(b + i);
-
-            //     __m256d sum = _mm256_add_pd(va, vb);                       
-            //     sum = _mm256_mul_pd(sum, factor);    
-            //     // _mm256_storeu_pd(p + i, sum);
-            //     // size_t start = i;
-            //     quantize_double<CompMode, step>(sum, i, data, offset, len);
-            // }
+            const size_t step = SVE2_parallelism;
+            svbool_t pg64 = svptrue_b64();
+            
+            for (; i  < len; i += step) {
+                svfloat64_t va = svld1(pg64, &a[i]);  
+                svfloat64_t vb = svld1(pg64, &b[i]);
+                vb = svmul_n_f64_x(pg64, vb, 1.5);
+                svfloat64_t sum = svmls_n_f64_x(pg64, vb, va, 0.5);
+                quantize_double<CompMode>(sum, i, data, offset, len, step, pg64);
+            }
         }
     }
 
@@ -1436,7 +1418,7 @@ namespace SZ3 {
 
         size_t i = 0;
         if constexpr (std::is_same_v<T, float>) {
-            const size_t step = 16;
+            const size_t step = SVE2_parallelism;
             svbool_t pg = svptrue_b32();
             svbool_t pg64 = svptrue_b64();
 
@@ -1452,23 +1434,19 @@ namespace SZ3 {
             }
         }
         else if constexpr (std::is_same_v<T, double>) {
-                    for (; i < len; ++i) {
-            size_t start = i * offset;
-            quantize_func(cur_ij_offset + start,  data[start], interp_quad_1(a[i], b[i], c[i]));
-        }
-            // constexpr size_t step = AVX_256_parallelism;
-            // const __m256d factor = _mm256_set1_pd(0.5);
+            const size_t step = SVE2_parallelism;
+            svbool_t pg64 = svptrue_b64();
+            
+            for (; i  < len; i += step) {
+                svfloat64_t vb = svld1(pg64, &b[i]);
+                svfloat64_t vc = svld1(pg64, &c[i]);
+                vb = svnmls_n_f64_x(pg64, vc, vb, 6.0);
+                svfloat64_t va = svld1(pg64, &a[i]);  
+                svfloat64_t sum = svmla_n_f64_x(pg64, vb, va, 3.0);
+                sum = svmul_n_f64_x(pg64, sum, 0.125);
+                quantize_double<CompMode>(sum, i, data, offset, len, step, pg64);
+            }
 
-            // for (; i  < len; i += step) {
-            //     __m256d va = _mm256_loadu_pd(a + i);
-            //     __m256d vb = _mm256_loadu_pd(b + i);
-
-            //     __m256d sum = _mm256_add_pd(va, vb);                       
-            //     sum = _mm256_mul_pd(sum, factor);    
-            //     // _mm256_storeu_pd(p + i, sum);
-            //     // size_t start = i;
-            //     quantize_double<CompMode, step>(sum, i, data, offset, len);
-            // }
         }      
     }
 
@@ -1478,7 +1456,7 @@ namespace SZ3 {
         size_t& offset, size_t& cur_ij_offset, QuantizeFunc &&quantize_func) {
         size_t i = 0;
         if constexpr (std::is_same_v<T, float>) {
-            const size_t step = 16;
+            const size_t step = SVE2_parallelism;
             svbool_t pg = svptrue_b32();
             svbool_t pg64 = svptrue_b64();
 
@@ -1495,23 +1473,22 @@ namespace SZ3 {
             }
         }
         else if constexpr (std::is_same_v<T, double>) {
-                    for (; i < len; ++i) {
-            size_t start = i * offset;
-            quantize_func(cur_ij_offset + start,  data[start], interp_quad_2(a[i], b[i], c[i]));
-        }
-            // constexpr size_t step = AVX_256_parallelism;
-            // const __m256d factor = _mm256_set1_pd(0.5);
 
-            // for (; i  < len; i += step) {
-            //     __m256d va = _mm256_loadu_pd(a + i);
-            //     __m256d vb = _mm256_loadu_pd(b + i);
+            const size_t step = SVE2_parallelism;
+            svbool_t pg = svptrue_b32();
+            svbool_t pg64 = svptrue_b64();
 
-            //     __m256d sum = _mm256_add_pd(va, vb);                       
-            //     sum = _mm256_mul_pd(sum, factor);    
-            //     // _mm256_storeu_pd(p + i, sum);
-            //     // size_t start = i;
-            //     quantize_double<CompMode, step>(sum, i, data, offset, len);
-            // }
+            for (; i  < len; i += step) {
+                svfloat64_t va = svld1(pg64, &a[i]);
+                svfloat64_t vb = svld1(pg64, &b[i]);
+                vb = svnmls_n_f64_x(pg64, va, vb, 6.0);
+
+                svfloat64_t vc = svld1(pg64, &c[i]);
+                svfloat64_t sum = svmla_n_f64_x(pg64, vb, vc, 3.0);
+                sum = svmul_n_f64_x(pg64, sum, 0.125);
+                // _mm256_storeu_ps(p + i, sum);
+                quantize_double<CompMode>(sum, i, data, offset, len, step, pg64);
+            }
         }   
       
     }
