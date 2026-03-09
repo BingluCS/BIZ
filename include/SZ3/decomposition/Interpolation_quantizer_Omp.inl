@@ -1609,248 +1609,248 @@ namespace SZ3 {
       
     // }
 
-    // template <class T, uint N, class QuantizerOMP>
-    // template<typename U, typename>
-    // ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_1D_float (
-    //     svfloat32_t& sum, svfloat32_t& ori_sve, svfloat32_t& quant_sve, T* tmp, svbool_t& pg, svbool_t& pg64) {
+    template <class T, uint N, class QuantizerOMP>
+    template<typename U, typename>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_1D_float (
+        svfloat32_t& sum, svfloat32_t& ori_sve, svfloat32_t& quant_sve, T* tmp, svbool_t& pg, svbool_t& pg64) {
             
-    //         svfloat64_t quant_even_f64 = svcvt_f64_f32_x(pg64, quant_sve);
-    //         svfloat64_t quant_odd_f64  = svcvtlt_f64_f32_x(pg64, quant_sve);
-    //         quant_even_f64 = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_even_f64, real_ebx2_r));
-    //         quant_odd_f64  = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_odd_f64, real_ebx2_r));
+            svfloat64_t quant_even_f64 = svcvt_f64_f32_x(pg64, quant_sve);
+            svfloat64_t quant_odd_f64  = svcvtlt_f64_f32_x(pg64, quant_sve);
+            quant_even_f64 = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_even_f64, real_ebx2_r));
+            quant_odd_f64  = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_odd_f64, real_ebx2_r));
 
-    //         svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_even_f64, -radius); // val > -radius
-    //         svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_even_f64,  radius); // val < +radius
-    //         svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
-    //         quant_even_f64 = svsel_f64(pg_in_range, quant_even_f64, svdup_n_f64(0.0));
+            svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_even_f64, -radius); // val > -radius
+            svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_even_f64,  radius); // val < +radius
+            svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
+            quant_even_f64 = svsel_f64(pg_in_range, quant_even_f64, svdup_n_f64(0.0));
 
-    //         svbool_t pg_gt_neg_o = svcmpgt_n_f64(pg64, quant_odd_f64, -radius);
-    //         svbool_t pg_lt_pos_o = svcmplt_n_f64(pg64, quant_odd_f64,  radius);
-    //         svbool_t pg_in_range_o = svand_b_z(pg64, pg_gt_neg_o, pg_lt_pos_o);
-    //         quant_odd_f64 = svsel_f64(pg_in_range_o, quant_odd_f64, svdup_n_f64(0.0));
+            svbool_t pg_gt_neg_o = svcmpgt_n_f64(pg64, quant_odd_f64, -radius);
+            svbool_t pg_lt_pos_o = svcmplt_n_f64(pg64, quant_odd_f64,  radius);
+            svbool_t pg_in_range_o = svand_b_z(pg64, pg_gt_neg_o, pg_lt_pos_o);
+            quant_odd_f64 = svsel_f64(pg_in_range_o, quant_odd_f64, svdup_n_f64(0.0));
 
-    //         // dequantization for decompression
+            // dequantization for decompression
 
-    //         svfloat64_t decompressed_even_f64 = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, sum),
-    //                 quant_even_f64, svdup_f64(real_ebx2));
-    //         svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svcvtlt_f64_f32_x(pg64, sum),
-    //                 quant_odd_f64, svdup_f64(real_ebx2));
+            svfloat64_t decompressed_even_f64 = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, sum),
+                    quant_even_f64, svdup_f64(real_ebx2));
+            svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svcvtlt_f64_f32_x(pg64, sum),
+                    quant_odd_f64, svdup_f64(real_ebx2));
 
-    //         // svfloat32_t even_f32 = svcvt_f32_f64_x(pg64, decompressed_even_f64);
-    //         // svfloat32_t odd_f32  = svcvtlt_f32_f64_x(pg64, decompressed_odd_f64);
-    //         svfloat32_t decompressed = svcvt_f32_f64_x(pg64, decompressed_even_f64);
-    //         decompressed = svcvtnt_f32_f64_x(decompressed, pg64, decompressed_odd_f64);
+            // svfloat32_t even_f32 = svcvt_f32_f64_x(pg64, decompressed_even_f64);
+            // svfloat32_t odd_f32  = svcvtlt_f32_f64_x(pg64, decompressed_odd_f64);
+            svfloat32_t decompressed = svcvt_f32_f64_x(pg64, decompressed_even_f64);
+            decompressed = svcvtnt_f32_f64_x(decompressed, pg64, decompressed_odd_f64);
             
-    //         svst1_f32(pg, tmp, decompressed);
+            svst1_f32(pg, tmp, decompressed);
 
-    //         // even_f32 = svcvt_f32_f64_x(pg64, quant_even_f64);
-    //         // odd_f32  = svcvt_f32_f64_x(pg64, quant_odd_f64);
-    //         // quant_sve = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
+            // even_f32 = svcvt_f32_f64_x(pg64, quant_even_f64);
+            // odd_f32  = svcvt_f32_f64_x(pg64, quant_odd_f64);
+            // quant_sve = svzip1_f32(svuzp1_f32(even_f32, even_f32), svuzp1_f32(odd_f32, odd_f32));
 
-    //         quant_sve = svcvt_f32_f64_x(pg64, quant_even_f64);
-    //         quant_sve = svcvtnt_f32_f64_x(quant_sve, pg64, quant_odd_f64);
+            quant_sve = svcvt_f32_f64_x(pg64, quant_even_f64);
+            quant_sve = svcvtnt_f32_f64_x(quant_sve, pg64, quant_odd_f64);
 
-    //         svfloat32_t err_dequan = svsub_f32_x(pg, decompressed, ori_sve);
-    //         quant_sve = svadd_n_f32_x(pg, quant_sve, radius);
+            svfloat32_t err_dequan = svsub_f32_x(pg, decompressed, ori_sve);
+            quant_sve = svadd_n_f32_x(pg, quant_sve, radius);
 
-    //         pg_in_range = svand_b_z(pg, svcmpge_n_f32(pg, err_dequan, -real_eb), svcmple_n_f32(pg, err_dequan, real_eb));
-    //         quant_sve = svsel_f32(pg_in_range, quant_sve, svdup_n_f32(0.0));
-    // }
+            pg_in_range = svand_b_z(pg, svcmpge_n_f32(pg, err_dequan, -real_eb), svcmple_n_f32(pg, err_dequan, real_eb));
+            quant_sve = svsel_f32(pg_in_range, quant_sve, svdup_n_f32(0.0));
+    }
 
-    // template <class T, uint N, class QuantizerOMP>
-    // template<typename U, typename>
-    // ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_1D_double (
-    //     svfloat64_t& sum, svfloat64_t& ori_sve, svfloat64_t& quant_sve, T* tmp, svbool_t& pg64) {
+    template <class T, uint N, class QuantizerOMP>
+    template<typename U, typename>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_1D_double (
+        svfloat64_t& sum, svfloat64_t& ori_sve, svfloat64_t& quant_sve, T* tmp, svbool_t& pg64) {
             
-    //     quant_sve = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_sve, real_ebx2_r));
+        quant_sve = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_sve, real_ebx2_r));
 
-    //     svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_sve, -radius);
-    //     svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_sve,  radius);
-    //     svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
-    //     quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
+        svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_sve, -radius);
+        svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_sve,  radius);
+        svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
+        quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
 
-    //     svfloat64_t decompressed = svmla_f64_x(pg64, sum, quant_sve, svdup_f64(real_ebx2));
-    //     svst1_f64(pg64, tmp, decompressed);
-    //     svfloat64_t err_dequan = svsub_f64_x(pg64, decompressed, ori_sve);
+        svfloat64_t decompressed = svmla_f64_x(pg64, sum, quant_sve, svdup_f64(real_ebx2));
+        svst1_f64(pg64, tmp, decompressed);
+        svfloat64_t err_dequan = svsub_f64_x(pg64, decompressed, ori_sve);
 
-    //     quant_sve = svadd_n_f64_x(pg64, quant_sve, radius);
-    //     pg_in_range = svand_b_z(pg64, svcmpge_n_f64(pg64, err_dequan, -real_eb), svcmple_n_f64(pg64, err_dequan, real_eb));
-    //     quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
-    // }
+        quant_sve = svadd_n_f64_x(pg64, quant_sve, radius);
+        pg_in_range = svand_b_z(pg64, svcmpge_n_f64(pg64, err_dequan, -real_eb), svcmple_n_f64(pg64, err_dequan, real_eb));
+        quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
+    }
 
-    // template <class T, uint N, class QuantizerOMP>
-    // template <COMPMODE CompMode, typename U, typename>
-    // ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_float (svfloat32_t& sum, size_t& start, T*& data, size_t& offset, 
-    //     size_t& len, const size_t& step, svbool_t& pg, svbool_t& pg64, int tid) {
-    //     if constexpr (CompMode == COMPMODE::COMP) {
-    //         T ori[step];
-    //         size_t base = start * offset;
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, typename U, typename>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_float (svfloat32_t& sum, size_t& start, T*& data, size_t& offset, 
+        size_t& len, const size_t& step, svbool_t& pg, svbool_t& pg64, int tid) {
+        if constexpr (CompMode == COMPMODE::COMP) {
+            T ori[step];
+            size_t base = start * offset;
 
-    //         #pragma unroll
-    //         for (size_t j = 0; j < step; ++j) {
-    //             ori[j] = data[base + j * offset];
-    //         }
+            #pragma unroll
+            for (size_t j = 0; j < step; ++j) {
+                ori[j] = data[base + j * offset];
+            }
 
-    //         svfloat32_t ori_sve = svld1(pg, ori);
-    //         svfloat32_t quant_sve = svsub_f32_x(pg, ori_sve, sum); // prediction error
+            svfloat32_t ori_sve = svld1(pg, ori);
+            svfloat32_t quant_sve = svsub_f32_x(pg, ori_sve, sum); // prediction error
 
-    //         T tmp[step];
-    //         int quant_vals[step];
+            T tmp[step];
+            int quant_vals[step];
 
-    //         // calculate quantization code
-    //         svfloat64_t quant_even_f64 = svcvt_f64_f32_x(pg64, quant_sve);
-    //         svfloat64_t quant_odd_f64  = svcvtlt_f64_f32_x(pg64, quant_sve);
-    //         quant_even_f64 = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_even_f64, real_ebx2_r));
-    //         quant_odd_f64  = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_odd_f64, real_ebx2_r));
+            // calculate quantization code
+            svfloat64_t quant_even_f64 = svcvt_f64_f32_x(pg64, quant_sve);
+            svfloat64_t quant_odd_f64  = svcvtlt_f64_f32_x(pg64, quant_sve);
+            quant_even_f64 = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_even_f64, real_ebx2_r));
+            quant_odd_f64  = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_odd_f64, real_ebx2_r));
 
-    //         svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_even_f64, -radius); // val > -radius
-    //         svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_even_f64,  radius); // val < +radius
-    //         svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
-    //         quant_even_f64 = svsel_f64(pg_in_range, quant_even_f64, svdup_n_f64(0.0));
+            svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_even_f64, -radius); // val > -radius
+            svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_even_f64,  radius); // val < +radius
+            svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
+            quant_even_f64 = svsel_f64(pg_in_range, quant_even_f64, svdup_n_f64(0.0));
 
-    //         svbool_t pg_gt_neg_o = svcmpgt_n_f64(pg64, quant_odd_f64, -radius);
-    //         svbool_t pg_lt_pos_o = svcmplt_n_f64(pg64, quant_odd_f64,  radius);
-    //         svbool_t pg_in_range_o = svand_b_z(pg64, pg_gt_neg_o, pg_lt_pos_o);
-    //         quant_odd_f64 = svsel_f64(pg_in_range_o, quant_odd_f64, svdup_n_f64(0.0));
+            svbool_t pg_gt_neg_o = svcmpgt_n_f64(pg64, quant_odd_f64, -radius);
+            svbool_t pg_lt_pos_o = svcmplt_n_f64(pg64, quant_odd_f64,  radius);
+            svbool_t pg_in_range_o = svand_b_z(pg64, pg_gt_neg_o, pg_lt_pos_o);
+            quant_odd_f64 = svsel_f64(pg_in_range_o, quant_odd_f64, svdup_n_f64(0.0));
             
-    //         // dequantization for decompression
-    //         svfloat64_t decompressed_even_f64 = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, sum),
-    //                 quant_even_f64, svdup_f64(real_ebx2));
-    //         svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svcvtlt_f64_f32_x(pg64, sum),
-    //                 quant_odd_f64, svdup_f64(real_ebx2));
+            // dequantization for decompression
+            svfloat64_t decompressed_even_f64 = svmla_f64_x(pg64, svcvt_f64_f32_x(pg64, sum),
+                    quant_even_f64, svdup_f64(real_ebx2));
+            svfloat64_t decompressed_odd_f64  = svmla_f64_x(pg64, svcvtlt_f64_f32_x(pg64, sum),
+                    quant_odd_f64, svdup_f64(real_ebx2));
 
-    //         svfloat32_t decompressed = svcvt_f32_f64_x(pg64, decompressed_even_f64);
-    //         decompressed = svcvtnt_f32_f64_x(decompressed, pg64, decompressed_odd_f64);
+            svfloat32_t decompressed = svcvt_f32_f64_x(pg64, decompressed_even_f64);
+            decompressed = svcvtnt_f32_f64_x(decompressed, pg64, decompressed_odd_f64);
             
-    //         svst1_f32(pg, tmp, decompressed);
+            svst1_f32(pg, tmp, decompressed);
 
-    //         quant_sve = svcvt_f32_f64_x(pg64, quant_even_f64);
-    //         quant_sve = svcvtnt_f32_f64_x(quant_sve, pg64, quant_odd_f64);
+            quant_sve = svcvt_f32_f64_x(pg64, quant_even_f64);
+            quant_sve = svcvtnt_f32_f64_x(quant_sve, pg64, quant_odd_f64);
 
-    //         svfloat32_t err_dequan = svsub_f32_x(pg, decompressed, ori_sve);
-    //         quant_sve = svadd_n_f32_x(pg, quant_sve, radius);
+            svfloat32_t err_dequan = svsub_f32_x(pg, decompressed, ori_sve);
+            quant_sve = svadd_n_f32_x(pg, quant_sve, radius);
 
-    //         pg_in_range = svand_b_z(pg, svcmpge_n_f32(pg, err_dequan, -real_eb), svcmple_n_f32(pg, err_dequan, real_eb));
-    //         quant_sve = svsel_f32(pg_in_range, quant_sve, svdup_n_f32(0.0));
+            pg_in_range = svand_b_z(pg, svcmpge_n_f32(pg, err_dequan, -real_eb), svcmple_n_f32(pg, err_dequan, real_eb));
+            quant_sve = svsel_f32(pg_in_range, quant_sve, svdup_n_f32(0.0));
 
-    //         svint32_t quant_sve_i = svcvt_s32_f32_z(pg, quant_sve);
-    //         svst1(pg, quant_vals, quant_sve_i);
-    //         size_t j = 0;
+            svint32_t quant_sve_i = svcvt_s32_f32_z(pg, quant_sve);
+            svst1(pg, quant_vals, quant_sve_i);
+            size_t j = 0;
             
-    //         #pragma unroll
-    //         for ( ; j < step && start + j < len; ++j) {
-    //             if (quant_vals[j] != 0) 
-    //                 data[(start + j) * offset] = tmp[j];
-    //             else
-    //                 quantizer.save_unpred2(ori[j], tid);
-    //             ++frequencyList[tid][quant_vals[j]];
-    //         }
+            #pragma unroll
+            for ( ; j < step && start + j < len; ++j) {
+                if (quant_vals[j] != 0) 
+                    data[(start + j) * offset] = tmp[j];
+                else
+                    quantizer.save_unpred2(ori[j], tid);
+                ++frequencyList[tid][quant_vals[j]];
+            }
 
-    //         svst1(pg, local_quant_inds[tid] + local_quant_index[tid].value, quant_sve_i);
-    //         local_quant_index[tid].value += j;
-    //     }
-    //     else if constexpr (CompMode == COMPMODE::DECOMP) { // decomp
-    //         svint32_t quant_sve_i = svld1_s32(pg, local_quant_inds[tid] + local_quant_index[tid].value);
-    //         int quant_vals[step];
-    //         svst1(pg, quant_vals, quant_sve_i);
-    //         quant_sve_i = svsub_n_s32_x(pg, quant_sve_i, radius);
+            svst1(pg, local_quant_inds[tid] + local_quant_index[tid].value, quant_sve_i);
+            local_quant_index[tid].value += j;
+        }
+        else if constexpr (CompMode == COMPMODE::DECOMP) { // decomp
+            svint32_t quant_sve_i = svld1_s32(pg, local_quant_inds[tid] + local_quant_index[tid].value);
+            int quant_vals[step];
+            svst1(pg, quant_vals, quant_sve_i);
+            quant_sve_i = svsub_n_s32_x(pg, quant_sve_i, radius);
             
-    //         svfloat64_t decompressed_even_f64 = svcvt_f64_s32_x(pg64, quant_sve_i);
-    //         svfloat64_t decompressed_odd_f64  = svcvtlt_f64_f32_x(pg64, svcvt_f32_s32_x(pg, quant_sve_i));
+            svfloat64_t decompressed_even_f64 = svcvt_f64_s32_x(pg64, quant_sve_i);
+            svfloat64_t decompressed_odd_f64  = svcvtlt_f64_f32_x(pg64, svcvt_f32_s32_x(pg, quant_sve_i));
             
-    //         decompressed_even_f64 = svmul_n_f64_x(pg64, decompressed_even_f64, real_ebx2);
-    //         decompressed_odd_f64 = svmul_n_f64_x(pg64, decompressed_odd_f64, real_ebx2);
+            decompressed_even_f64 = svmul_n_f64_x(pg64, decompressed_even_f64, real_ebx2);
+            decompressed_odd_f64 = svmul_n_f64_x(pg64, decompressed_odd_f64, real_ebx2);
             
-    //         svfloat32_t decompressed = svcvt_f32_f64_x(pg64, decompressed_even_f64);
-    //         decompressed = svcvtnt_f32_f64_x(decompressed, pg64, decompressed_odd_f64);
+            svfloat32_t decompressed = svcvt_f32_f64_x(pg64, decompressed_even_f64);
+            decompressed = svcvtnt_f32_f64_x(decompressed, pg64, decompressed_odd_f64);
             
-    //         decompressed = svadd_f32_x(pg, decompressed, sum);
+            decompressed = svadd_f32_x(pg, decompressed, sum);
 
-    //         T tmp[step];
-    //         svst1_f32(pg, tmp, decompressed);
+            T tmp[step];
+            svst1_f32(pg, tmp, decompressed);
             
-    //         size_t j = 0;
-    //         #pragma unroll
-    //         for ( ; j < step && start + j < len; ++j) {
-    //             if (quant_vals[j] != 0) 
-    //                 data[(start + j) * offset] = tmp[j];
-    //             else 
-    //                 data[(start + j) * offset] = quantizer.recover_unpred2(tid);
-    //         }
-    //         local_quant_index[tid].value += j;
-    //     }
-    // }
+            size_t j = 0;
+            #pragma unroll
+            for ( ; j < step && start + j < len; ++j) {
+                if (quant_vals[j] != 0) 
+                    data[(start + j) * offset] = tmp[j];
+                else 
+                    data[(start + j) * offset] = quantizer.recover_unpred2(tid);
+            }
+            local_quant_index[tid].value += j;
+        }
+    }
 
-    // template <class T, uint N, class QuantizerOMP>
-    // template <COMPMODE CompMode, typename U, typename>
-    // ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_double (svfloat64_t& sum, size_t& start, T*& data, size_t& offset, 
-    //     size_t& len, const size_t& step, svbool_t& pg64, int tid) {
-    //     if constexpr (CompMode == COMPMODE::COMP) {
-    //         T ori[step];
-    //         size_t base = start * offset;
+    template <class T, uint N, class QuantizerOMP>
+    template <COMPMODE CompMode, typename U, typename>
+    ALWAYS_INLINE void InterpolationDecomposition_OMP<T, N, QuantizerOMP>::quantize_double (svfloat64_t& sum, size_t& start, T*& data, size_t& offset, 
+        size_t& len, const size_t& step, svbool_t& pg64, int tid) {
+        if constexpr (CompMode == COMPMODE::COMP) {
+            T ori[step];
+            size_t base = start * offset;
 
-    //         #pragma unroll
-    //         for (size_t j = 0; j < step; ++j) {
-    //             ori[j] = data[base + j * offset];
-    //         }
+            #pragma unroll
+            for (size_t j = 0; j < step; ++j) {
+                ori[j] = data[base + j * offset];
+            }
 
-    //         svfloat64_t ori_sve = svld1(pg64, ori);
-    //         svfloat64_t quant_sve = svsub_f64_x(pg64, ori_sve, sum); // prediction error
-    //         T tmp[step];
-    //         int quant_vals[step];
+            svfloat64_t ori_sve = svld1(pg64, ori);
+            svfloat64_t quant_sve = svsub_f64_x(pg64, ori_sve, sum); // prediction error
+            T tmp[step];
+            int quant_vals[step];
             
-    //         quant_sve = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_sve, real_ebx2_r));
+            quant_sve = svrintn_f64_x(pg64, svmul_n_f64_x(pg64, quant_sve, real_ebx2_r));
 
-    //         svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_sve, -radius);
-    //         svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_sve,  radius);
-    //         svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
-    //         quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
+            svbool_t pg_gt_neg = svcmpgt_n_f64(pg64, quant_sve, -radius);
+            svbool_t pg_lt_pos = svcmplt_n_f64(pg64, quant_sve,  radius);
+            svbool_t pg_in_range = svand_b_z(pg64, pg_gt_neg, pg_lt_pos);
+            quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
 
-    //         svfloat64_t decompressed = svmla_f64_x(pg64, sum, quant_sve, svdup_f64(real_ebx2));
-    //         svst1_f64(pg64, tmp, decompressed);
-    //         svfloat64_t err_dequan = svsub_f64_x(pg64, decompressed, ori_sve);
+            svfloat64_t decompressed = svmla_f64_x(pg64, sum, quant_sve, svdup_f64(real_ebx2));
+            svst1_f64(pg64, tmp, decompressed);
+            svfloat64_t err_dequan = svsub_f64_x(pg64, decompressed, ori_sve);
 
-    //         quant_sve = svadd_n_f64_x(pg64, quant_sve, radius);
-    //         pg_in_range = svand_b_z(pg64, svcmpge_n_f64(pg64, err_dequan, -real_eb), svcmple_n_f64(pg64, err_dequan, real_eb));
-    //         quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
+            quant_sve = svadd_n_f64_x(pg64, quant_sve, radius);
+            pg_in_range = svand_b_z(pg64, svcmpge_n_f64(pg64, err_dequan, -real_eb), svcmple_n_f64(pg64, err_dequan, real_eb));
+            quant_sve = svsel_f64(pg_in_range, quant_sve, svdup_n_f64(0.0));
 
             
-    //         svint64_t quant_sve_i = svcvt_s64_f64_x(pg64, quant_sve);
+            svint64_t quant_sve_i = svcvt_s64_f64_x(pg64, quant_sve);
             
-    //         svst1w_s64(pg64, quant_vals, quant_sve_i);
+            svst1w_s64(pg64, quant_vals, quant_sve_i);
 
-    //         size_t j = 0;
-    //         #pragma unroll
-    //         for ( ; j < step && start + j < len; ++j) {
-    //             if (quant_vals[j] != 0)
-    //                 data[(start + j) * offset] = tmp[j];
-    //             else
-    //                 quantizer.save_unpred2(ori[j], tid);
-    //             ++frequencyList[tid][quant_vals[j]];
-    //         }
-    //         svst1w_s64(pg64, local_quant_inds[tid] + local_quant_index[tid].value, quant_sve_i);
-    //         local_quant_index[tid].value += j;
-    //     }
-    //     else if constexpr (CompMode == COMPMODE::DECOMP) { 
-    //         svint64_t quant_sve_i = svld1sw_s64(pg64, local_quant_inds[tid] + local_quant_index[tid].value);
-    //         int quant_vals[step];
-    //         svst1w_s64(pg64, quant_vals, quant_sve_i);
-    //         quant_sve_i = svsub_n_s64_x(pg64, quant_sve_i, radius);
+            size_t j = 0;
+            #pragma unroll
+            for ( ; j < step && start + j < len; ++j) {
+                if (quant_vals[j] != 0)
+                    data[(start + j) * offset] = tmp[j];
+                else
+                    quantizer.save_unpred2(ori[j], tid);
+                ++frequencyList[tid][quant_vals[j]];
+            }
+            svst1w_s64(pg64, local_quant_inds[tid] + local_quant_index[tid].value, quant_sve_i);
+            local_quant_index[tid].value += j;
+        }
+        else if constexpr (CompMode == COMPMODE::DECOMP) { 
+            svint64_t quant_sve_i = svld1sw_s64(pg64, local_quant_inds[tid] + local_quant_index[tid].value);
+            int quant_vals[step];
+            svst1w_s64(pg64, quant_vals, quant_sve_i);
+            quant_sve_i = svsub_n_s64_x(pg64, quant_sve_i, radius);
 
-    //         svfloat64_t decompressed = svmla_f64_x(pg64, sum, 
-    //                 svcvt_f64_s64_x(pg64, quant_sve_i), svdup_f64(real_ebx2));
-    //         T tmp[step];
-    //         svst1_f64(pg64, tmp, decompressed);
-    //         size_t j = 0;
-    //         for ( ; j < step && start + j < len; ++j) {
-    //             if (quant_vals[j] != 0) 
-    //                 data[(start + j) * offset] = tmp[j];
-    //             else
-    //                 data[(start + j) * offset] = quantizer.recover_unpred2(tid);
-    //         }
-    //         local_quant_index[tid].value += j;  
-    //     }
-    // }
+            svfloat64_t decompressed = svmla_f64_x(pg64, sum, 
+                    svcvt_f64_s64_x(pg64, quant_sve_i), svdup_f64(real_ebx2));
+            T tmp[step];
+            svst1_f64(pg64, tmp, decompressed);
+            size_t j = 0;
+            for ( ; j < step && start + j < len; ++j) {
+                if (quant_vals[j] != 0) 
+                    data[(start + j) * offset] = tmp[j];
+                else
+                    data[(start + j) * offset] = quantizer.recover_unpred2(tid);
+            }
+            local_quant_index[tid].value += j;  
+        }
+    }
 
 #else 
 
