@@ -1742,7 +1742,7 @@ namespace SZ3 {
         auto even_len = len - odd_len;
         size_t i = 0;
 
-        for (; i + 1  < even_len; ++i) {
+        for (; i + 1  < odd_len; ++i) {
             size_t start = ((i << 1) + 1) * offset;
             quantize_func(cur_ij_offset + start,  data[start], interp_linear(buf[i], buf[i + 1]), tid);
         }
