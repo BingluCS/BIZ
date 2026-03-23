@@ -8,26 +8,28 @@
 namespace SZ3 {
 template <class T, uint N>
 size_t SZ_compress_impl(Config &conf, const T *data, uchar *cmpData, size_t cmpCap) {
-#ifndef _OPENMP
-    conf.openmp = false;
-#endif
-    if (conf.openmp) {
-        return SZ_compress_OMP<T, N>(conf, data, cmpData, cmpCap);
-    } else {
-        return SZ_compress_dispatcher<T, N>(conf, data, cmpData, cmpCap);
-    }
+    return SZ_compress_dispatcher<T, N>(conf, data, cmpData, cmpCap);
+// #ifndef _OPENMP
+//     conf.openmp = false;
+// #endif
+//     if (conf.openmp) {
+//         return SZ_compress_OMP<T, N>(conf, data, cmpData, cmpCap);
+//     } else {
+//         return SZ_compress_dispatcher<T, N>(conf, data, cmpData, cmpCap);
+//     }
 }
 
 template <class T, uint N>
 void SZ_decompress_impl(Config &conf, const uchar *cmpData, size_t cmpSize, T *decData) {
-#ifndef _OPENMP
-    conf.openmp = false;
-#endif
-    if (conf.openmp) {
-        SZ_decompress_OMP<T, N>(conf, cmpData, cmpSize, decData);
-    } else {
-        SZ_decompress_dispatcher<T, N>(conf, cmpData, cmpSize, decData);
-    }
+    SZ_decompress_dispatcher<T, N>(conf, cmpData, cmpSize, decData);
+// #ifndef _OPENMP
+//     conf.openmp = false;
+// #endif
+//     if (conf.openmp) {
+//         SZ_decompress_OMP<T, N>(conf, cmpData, cmpSize, decData);
+//     } else {
+//         SZ_decompress_dispatcher<T, N>(conf, cmpData, cmpSize, decData);
+//     }
 }
 
 template <class T>
