@@ -113,7 +113,7 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
         eb_beta = conf.interpBeta;
 
         init();
-        blocksize = max_dim;
+        blocksize = max_dim << 1;
 #ifdef __ARM_FEATURE_SVE2
         buffer_len = max_dim +  2 * SVE2_parallelism - max_dim % SVE2_parallelism;
 #else
@@ -236,7 +236,7 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
    private:
     void init() {
         quant_index = 0;
-        assert(blocksize % 2 == 0 && "Interpolation block size should be even numbers");
+        //assert(blocksize % 2 == 0 && "Interpolation block size should be even numbers");
         assert((anchor_stride & anchor_stride - 1) == 0 && "Anchor stride should be 0 or 2's exponentials");
         num_elements = 1;
         interp_level = -1;

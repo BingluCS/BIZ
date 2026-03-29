@@ -175,7 +175,7 @@ class InterpolationDecomposition_OMP : public concepts::DecompositionInterface_O
         eb_beta = conf.interpBeta;
 
         init();
-        blocksize = max_dim;
+        blocksize = max_dim << 1;
         auto default_nThreads = omp_get_max_threads();
         //std::cout<<"max threads: "<<default_nThreads<<std::endl;
 
@@ -393,7 +393,7 @@ class InterpolationDecomposition_OMP : public concepts::DecompositionInterface_O
        
         quant_index = 0;
         radius = quantizer.get_out_range().second / 2;
-        assert(blocksize % 2 == 0 && "Interpolation block size should be even numbers");
+        //assert(blocksize % 2 == 0 && "Interpolation block size should be even numbers");
         assert((anchor_stride & anchor_stride - 1) == 0 && "Anchor stride should be 0 or 2's exponentials");
         num_elements = 1;
         interp_level = -1;
