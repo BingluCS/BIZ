@@ -33,59 +33,59 @@ calAbsErrorBound(conf, data);
     // do lossy compression
     bool isCmpCapSufficient = true;
     if (conf.cmprAlgo != ALGO_LOSSLESS) {
-        size_t alignment = 256; 
-        T * dataCopy = nullptr;
+        // size_t alignment = 256; 
+        // T * dataCopy = nullptr;
 
         try {
-#ifdef SZ3_PRINT_TIMINGS
-            Timer timer(true);
-#endif
-           // std::vector<T> dataCopy(data, data + conf.num);
-            auto n = conf.num;
-            // dataCopy = new T[n];
-            dataCopy= static_cast<T*>(::operator new(n * sizeof(T), std::align_val_t(alignment)));
+// #ifdef SZ3_PRINT_TIMINGS
+//             Timer timer(true);
+// #endif
+//            // std::vector<T> dataCopy(data, data + conf.num);
+//             auto n = conf.num;
+//             // dataCopy = new T[n];
+//             dataCopy= static_cast<T*>(::operator new(n * sizeof(T), std::align_val_t(alignment)));
 
-            #ifdef _OPENMP
+//             #ifdef _OPENMP
 
-                int max_threads = omp_get_max_threads();
-                auto n_threads = std::min(max_threads, static_cast<int>(n) / 65536);
+//                 int max_threads = omp_get_max_threads();
+//                 auto n_threads = std::min(max_threads, static_cast<int>(n) / 65536);
 
-                if(n_threads > 1){
-                    omp_set_num_threads(n_threads);
-                    #pragma omp parallel
-                    {
-                        int tid  = omp_get_thread_num();
-                        int nth  = omp_get_num_threads();
+//                 if(n_threads > 1){
+//                     omp_set_num_threads(n_threads);
+//                     #pragma omp parallel
+//                     {
+//                         int tid  = omp_get_thread_num();
+//                         int nth  = omp_get_num_threads();
 
-                        std::size_t begin =  static_cast<std::size_t>(tid) * n /  static_cast<std::size_t>(nth);
-                        std::size_t end   =  static_cast<std::size_t>(tid + 1) * n / static_cast<std::size_t>(nth);
+//                         std::size_t begin =  static_cast<std::size_t>(tid) * n /  static_cast<std::size_t>(nth);
+//                         std::size_t end   =  static_cast<std::size_t>(tid + 1) * n / static_cast<std::size_t>(nth);
 
-                        std::size_t len   = end - begin;
-                        if (len > 0) {
-                            std::memcpy(dataCopy + begin, data + begin, len * sizeof(T));
-                        }
-                    }
-                    omp_set_num_threads(max_threads);
-                }
-                else
-                    std::memcpy(dataCopy, data, n * sizeof(T));
-            #else
-                std::memcpy(dataCopy, data, n * sizeof(T));
-            #endif
-#ifdef SZ3_PRINT_TIMINGS
-             timer.stop("datacopy");
-#endif
+//                         std::size_t len   = end - begin;
+//                         if (len > 0) {
+//                             std::memcpy(dataCopy + begin, data + begin, len * sizeof(T));
+//                         }
+//                     }
+//                     omp_set_num_threads(max_threads);
+//                 }
+//                 else
+//                     std::memcpy(dataCopy, data, n * sizeof(T));
+//             #else
+//                 std::memcpy(dataCopy, data, n * sizeof(T));
+//             #endif
+// #ifdef SZ3_PRINT_TIMINGS
+//              timer.stop("datacopy");
+// #endif
 #ifdef SZ3_PRINT_TIMINGS
              timer.start();
 #endif
             if (conf.cmprAlgo == ALGO_LORENZO_REG) {
-                cmpSize = SZ_compress_LorenzoReg<T, N>(conf, dataCopy, cmpData, cmpCap);
+                cmpSize = SZ_compress_LorenzoReg<T, N>(conf, const_cast<T *>(data), cmpData, cmpCap);
             } else if (conf.cmprAlgo == ALGO_INTERP) {
-                cmpSize = SZ_compress_Interp<T, N>(conf, dataCopy, cmpData, cmpCap);
+                cmpSize = SZ_compress_Interp<T, N>(conf, const_cast<T *>(data), cmpData, cmpCap);
             } else if (conf.cmprAlgo == ALGO_INTERP_LORENZO) {
-                cmpSize = SZ_compress_Interp_lorenzo<T, N>(conf, dataCopy, cmpData, cmpCap);
+                cmpSize = SZ_compress_Interp_lorenzo<T, N>(conf, const_cast<T *>(data), cmpData, cmpCap);
             } else if (conf.cmprAlgo == ALGO_NOPRED) {
-                cmpSize = SZ_compress_nopred<T, N>(conf, dataCopy, cmpData, cmpCap);
+                cmpSize = SZ_compress_nopred<T, N>(conf, const_cast<T *>(data), cmpData, cmpCap);
             } else {
                 throw std::invalid_argument("Unknown compression algorithm");
             }
@@ -98,8 +98,8 @@ calAbsErrorBound(conf, data);
 //              timer.stop("delete");
 // #endif
         } catch (std::length_error &e) {
-            if(dataCopy)
-                ::operator delete(dataCopy, std::align_val_t(alignment));
+            // if(dataCopy)
+            //     ::operator delete(dataCopy, std::align_val_t(alignment));
             if (std::string(e.what()) == SZ3_ERROR_COMP_BUFFER_NOT_LARGE_ENOUGH) {
                 isCmpCapSufficient = false;
                 printf("SZ is downgraded to lossless mode because the buffer for compressed data is not large enough.\n");
