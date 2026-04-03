@@ -149,6 +149,17 @@ double interp_compress_test(
     auto cmpSize = lossless.compress(buffer, cur_size, cmpData, cmpCap);
 
     auto compression_ratio = conf.num * sampled_blocks.size() * sizeof(T) * 1.0 / cmpSize;
+    
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
+    for (size_t k = 0; k < sample_size; ++k) {
+        delete[] quant_inds[k];
+    }
+    delete[] quant_inds;
+    delete[] quant_inds_size;
+    delete[] buffer;
+
     return compression_ratio;
 
 }
@@ -299,6 +310,7 @@ size_t SZ_compress_Interp_lorenzo(Config &conf, T *data, uchar *cmpData, size_t 
                 test_config.interpDirection = reverse;
             // std::cout<<"Testing interp algo "<<int(test_config.interpAlgo)<<" direction "<<int(test_config.interpDirection)<<std::endl;
             ratios[i] = interp_compress_test<T, N>(sampled_blocks, test_config, sampleBlockSize, buffer, bufferCap);
+            free(buffer);
         }
         for(int i = 0; i < 4; i++) {
             if (ratios[i] > best_interp_ratio) {
