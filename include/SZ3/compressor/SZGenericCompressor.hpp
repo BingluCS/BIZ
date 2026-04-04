@@ -72,6 +72,7 @@ class SZGenericCompressor : public concepts::CompressorInterface<T> {
             write<size_t>(quant_inds_size, buffer_pos);
             if constexpr ((std::is_same_v<Decomposition, TargetDecomposition>)) {
                encoder.preprocess_encode(quant_inds, quant_inds_size, decomposition.get_out_range().second, decomposition.frequency);
+               delete[] decomposition.frequency;
             }
             else encoder.preprocess_encode(quant_inds, quant_inds_size, decomposition.get_out_range().second);
             
@@ -86,11 +87,9 @@ class SZGenericCompressor : public concepts::CompressorInterface<T> {
             cmpDataPos+=zstdSize;
             free(buffer);
         }
-    delete[] quant_inds;
 #ifdef SZ3_PRINT_TIMINGS
         timer.stop("zstd");
 #endif
-
         return cmpDataPos-cmpData;
     }
 
