@@ -87,6 +87,7 @@ class SZGenericCompressor : public concepts::CompressorInterface<T> {
             cmpDataPos+=zstdSize;
             free(buffer);
         }
+        delete[] quant_inds;
 #ifdef SZ3_PRINT_TIMINGS
         timer.stop("zstd");
 #endif
@@ -128,6 +129,7 @@ class SZGenericCompressor : public concepts::CompressorInterface<T> {
 #ifdef SZ3_PRINT_TIMINGS
     timer.stop("decomposition decompress");
 #endif
+        delete[] quant_inds;
         return decData;
     }
 
