@@ -130,9 +130,7 @@ class InterpolationDecomposition : public concepts::DecompositionInterface<T, in
             interp_buffer_1[i] = interp_buffer_2[i] = interp_buffer_3[i] = interp_buffer_4[i] = T(0);
        
         double eb = quantizer.get_eb();
-        std::unique_ptr<int[]> owned_quant_inds(new int[num_elements]);
-        quant_inds = owned_quant_inds.get();
-        // quant_inds = new int[num_elements];
+        quant_inds = new int[num_elements];
         if (anchor_stride == 0) {  // check whether to use anchor points
             quant_inds[quant_index++] = quantizer.quantize_and_overwrite(*data, 0);  // no
         } else {

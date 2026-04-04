@@ -86,9 +86,11 @@ class SZGenericCompressor : public concepts::CompressorInterface<T> {
             cmpDataPos+=zstdSize;
             free(buffer);
         }
+    delete[] quant_inds;
 #ifdef SZ3_PRINT_TIMINGS
         timer.stop("zstd");
 #endif
+
         return cmpDataPos-cmpData;
     }
 
