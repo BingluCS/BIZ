@@ -60,11 +60,11 @@ inline void usage() {
     printf("	-3 <nx> <ny> <nz> : dimensions for 3D data such as data[nz][ny][nx] \n");
     printf("	-4 <nx> <ny> <nz> <np>: dimensions for 4D data such as data[np][nz][ny][nx] \n");
     printf("* examples: \n");
-    printf("	sz -f -i test.dat    -z test.dat.sz     -3 8 8 128 -M ABS 1e-3 \n");
-    printf("	sz -f -z test.dat.sz -o test.dat.sz.out -3 8 8 128 -M REL 1e-3 -a \n");
-    printf("	sz -f -i test.dat    -o test.dat.sz.out -3 8 8 128 -M ABS_AND_REL -A 1 -R 1e-3 -a \n");
-    printf("	sz -f -i test.dat    -o test.dat.sz.out -3 8 8 128 -c sz.config \n");
-    printf("	sz -f -i test.dat    -o test.dat.sz.out -3 8 8 128 -c sz.config -M ABS 1e-3 -a\n");
+    printf("	szo -f -i test.dat    -z test.dat.sz     -3 8 8 128 -M ABS 1e-3 \n");
+    printf("	szo -f -z test.dat.sz -o test.dat.sz.out -3 8 8 128 -M REL 1e-3 -a \n");
+    printf("	szo -f -i test.dat    -o test.dat.sz.out -3 8 8 128 -M ABS_AND_REL -A 1 -R 1e-3 -a \n");
+    printf("	szo -f -i test.dat    -o test.dat.sz.out -3 8 8 128 -c sz.config \n");
+    printf("	szo -f -i test.dat    -o test.dat.sz.out -3 8 8 128 -c sz.config -M ABS 1e-3 -a\n");
     exit(0);
 }
 
@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
     char *normErrorBound = nullptr;
 
     bool sz2mode = false;
-
+    bool enable_openmp = false;
     size_t r4 = 0;
     size_t r3 = 0;
     size_t r2 = 0;
@@ -309,6 +309,8 @@ int main(int argc, char *argv[]) {
                 if (++i == argc) usage();
                 conPath = argv[i];
                 break;
+            case 'p':
+                enable_openmp = true;
             case '1':
                 if (++i == argc || sscanf(argv[i], "%zu", &r1) != 1) usage();
                 break;
@@ -390,6 +392,7 @@ int main(int argc, char *argv[]) {
     }
 
     SZ3::Config conf;
+    conf.openmp = enable_openmp;
     if (r2 == 0) {
         conf = SZ3::Config(r1);
     } else if (r3 == 0) {

@@ -7,6 +7,13 @@
 
 #include "Config.hpp"
 
+#include <algorithm>
+#include <type_traits>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #ifdef __AVX2__
 #include <immintrin.h>
 #endif
@@ -17,168 +24,74 @@
 
 namespace SZ3 {
 
-#ifdef __ARM_FEATURE_SVE2
-// Helper: SVE2 min/max over a contiguous chunk [begin, end).
-// Must live in its own target("sve2") function to avoid GCC ICE
-// when SVE intrinsics are instantiated inside an omp parallel region.
-__attribute__((target("+sve2")))
-inline void sve2_minmax_f32(const float *data, size_t begin, size_t end,
-                             float &out_min, float &out_max) {
-    const size_t vl = svcntw();
-    svbool_t pg = svptrue_b32();
-    svfloat32_t vmax = svdup_f32(data[begin]);
-    svfloat32_t vmin = svdup_f32(data[begin]);
-    size_t i = begin;
-    for (; i + vl <= end; i += vl) {
-        svfloat32_t v = svld1_f32(pg, data + i);
-        vmax = svmax_f32_x(pg, vmax, v);
-        vmin = svmin_f32_x(pg, vmin, v);
-    }
-    out_max = svmaxv_f32(pg, vmax);
-    out_min = svminv_f32(pg, vmin);
-    for (; i < end; ++i) {
-        out_max = std::max(out_max, data[i]);
-        out_min = std::min(out_min, data[i]);
-    }
-}
-
-__attribute__((target("+sve2")))
-inline void sve2_minmax_f64(const double *data, size_t begin, size_t end,
-                              double &out_min, double &out_max) {
-    const size_t vl = svcntd();
-    svbool_t pg = svptrue_b64();
-    svfloat64_t vmax = svdup_f64(data[begin]);
-    svfloat64_t vmin = svdup_f64(data[begin]);
-    size_t i = begin;
-    for (; i + vl <= end; i += vl) {
-        svfloat64_t v = svld1_f64(pg, data + i);
-        vmax = svmax_f64_x(pg, vmax, v);
-        vmin = svmin_f64_x(pg, vmin, v);
-    }
-    out_max = svmaxv_f64(pg, vmax);
-    out_min = svminv_f64(pg, vmin);
-    for (; i < end; ++i) {
-        out_max = std::max(out_max, data[i]);
-        out_min = std::min(out_min, data[i]);
-    }
-}
-#endif
 template <class T>
-T data_range(const T *data, size_t num) {
-
-    
-    if( num <= 16){
-        T max = data[0];
-        T min = data[0];
-        for (size_t i = 1; i < num; ++i) {
-            if (max < data[i]) max = data[i];
-            if (min > data[i]) min = data[i];
-        }
-        return max - min;
-
+inline void scalar_minmax(const T *data, size_t begin, size_t end, T &out_min, T &out_max) {
+    out_min = out_max = data[begin];
+    for (size_t i = begin + 1; i < end; ++i) {
+        out_max = std::max(out_max, data[i]);
+        out_min = std::min(out_min, data[i]);
     }
+}
 
-    T max_val = data[0];
-    T min_val = data[0];
 #ifdef __ARM_FEATURE_SVE2
-    constexpr bool is_float  = std::is_same_v<T, float>;
-    constexpr bool is_double = std::is_same_v<T, double>;
-    if constexpr (is_float) {
-#ifdef _OPENMP
-        // Call SVE2 via a separate target("sve2") function to avoid GCC ICE
-        // when SVE intrinsics appear inside an omp parallel region.
-        #pragma omp parallel reduction(min:min_val) reduction(max:max_val)
-        {
-            float t_max = data[0], t_min = data[0];
-            #pragma omp for schedule(static) nowait
-            for (size_t i = 0; i < num; i += svcntw()) {
-                size_t end = std::min(i + svcntw(), num);
-                float chunk_min, chunk_max;
-                sve2_minmax_f32(data, i, end, chunk_min, chunk_max);
-                t_max = std::max(t_max, chunk_max);
-                t_min = std::min(t_min, chunk_min);
-            }
-            max_val = std::max(max_val, t_max);
-            min_val = std::min(min_val, t_min);
-        }
-        return max_val - min_val;
-#else
+template <class T>
+inline void sve2_minmax(const T *data, size_t begin, size_t end, T &out_min, T &out_max) {
+    if constexpr (std::is_same_v<T, float>) {
         const size_t vl = svcntw();
-        svbool_t pg = svptrue_b32();
-        svfloat32_t vmax = svdup_f32(data[0]);
-        svfloat32_t vmin = svdup_f32(data[0]);
-        size_t i = 0;
-        for (; i + vl <= num; i += vl) {
-            svfloat32_t v = svld1_f32(pg, data + i);
+        const svbool_t pg = svptrue_b32();
+        svfloat32_t vmax = svdup_f32(data[begin]);
+        svfloat32_t vmin = svdup_f32(data[begin]);
+
+        size_t i = begin;
+        for (; i + vl <= end; i += vl) {
+            const svfloat32_t v = svld1_f32(pg, data + i);
             vmax = svmax_f32_x(pg, vmax, v);
             vmin = svmin_f32_x(pg, vmin, v);
         }
-        T maxval = static_cast<T>(svmaxv_f32(pg, vmax));
-        T minval = static_cast<T>(svminv_f32(pg, vmin));
-        for (; i < num; ++i) {
-            maxval = std::max(maxval, data[i]);
-            minval = std::min(minval, data[i]);
-        }
-        return maxval - minval;
-#endif
-    } else if constexpr (is_double) {
-#ifdef _OPENMP
-        #pragma omp parallel reduction(min:min_val) reduction(max:max_val)
-        {
-            double t_max = data[0], t_min = data[0];
-            #pragma omp for schedule(static) nowait
-            for (size_t i = 0; i < num; i += svcntd()) {
-                size_t end = std::min(i + svcntd(), num);
-                double chunk_min, chunk_max;
-                sve2_minmax_f64(data, i, end, chunk_min, chunk_max);
-                t_max = std::max(t_max, chunk_max);
-                t_min = std::min(t_min, chunk_min);
-            }
-            max_val = std::max(max_val, t_max);
-            min_val = std::min(min_val, t_min);
-        }
-        return max_val - min_val;
-#else
-        const size_t vl = svcntd();
-        svbool_t pg64 = svptrue_b64();
-        svfloat64_t vmax = svdup_f64(data[0]);
-        svfloat64_t vmin = svdup_f64(data[0]);
-        size_t i = 0;
-        for (; i + vl <= num; i += vl) {
-            svfloat64_t v = svld1_f64(pg64, data + i);
-            vmax = svmax_f64_x(pg64, vmax, v);
-            vmin = svmin_f64_x(pg64, vmin, v);
-        }
-        T maxval = static_cast<T>(svmaxv_f64(pg64, vmax));
-        T minval = static_cast<T>(svminv_f64(pg64, vmin));
-        for (; i < num; ++i) {
-            maxval = std::max(maxval, data[i]);
-            minval = std::min(minval, data[i]);
-        }
-        return maxval - minval;
-#endif
-    } else {
-        for (size_t i = 1; i < num; ++i) {
-            if (data[i] > max_val) max_val = data[i];
-            if (data[i] < min_val) min_val = data[i];
-        }
-        return max_val - min_val;
-    }
-#elif defined(__AVX2__)
-    constexpr bool is_float  = std::is_same_v<T, float>;
-    constexpr bool is_double = std::is_same_v<T, double>;
-    if constexpr (is_float){
-#ifdef _OPENMP
-    int res = num % 8;
-    #pragma omp parallel reduction(min:min_val) reduction(max:max_val)
-    {
-        size_t i = 0;
-        __m256 vmax = _mm256_set1_ps(data[0]);
-        __m256 vmin = _mm256_set1_ps(data[0]);
 
-        #pragma omp for nowait
-        for (i = 0; i < num - res; i += 8) {
-            __m256 v = _mm256_loadu_ps(data + i);
+        out_max = svmaxv_f32(pg, vmax);
+        out_min = svminv_f32(pg, vmin);
+        for (; i < end; ++i) {
+            out_max = std::max(out_max, data[i]);
+            out_min = std::min(out_min, data[i]);
+        }
+    }
+    else if constexpr (std::is_same_v<T, double>) {
+        const size_t vl = svcntd();
+        const svbool_t pg = svptrue_b64();
+        svfloat64_t vmax = svdup_f64(data[begin]);
+        svfloat64_t vmin = svdup_f64(data[begin]);
+
+        size_t i = begin;
+        for (; i + vl <= end; i += vl) {
+            const svfloat64_t v = svld1_f64(pg, data + i);
+            vmax = svmax_f64_x(pg, vmax, v);
+            vmin = svmin_f64_x(pg, vmin, v);
+        }
+
+        out_max = svmaxv_f64(pg, vmax);
+        out_min = svminv_f64(pg, vmin);
+        for (; i < end; ++i) {
+            out_max = std::max(out_max, data[i]);
+            out_min = std::min(out_min, data[i]);
+        }
+    }
+    else {
+        scalar_minmax(data, begin, end, out_min, out_max);
+    }
+}
+#endif
+
+#ifdef __AVX2__
+template <class T>
+inline void avx2_minmax(const T *data, size_t begin, size_t end, T &out_min, T &out_max) {
+    if constexpr (std::is_same_v<T, float>) {
+        __m256 vmax = _mm256_set1_ps(data[begin]);
+        __m256 vmin = _mm256_set1_ps(data[begin]);
+
+        size_t i = begin;
+        for (; i + 8 <= end; i += 8) {
+            const __m256 v = _mm256_loadu_ps(data + i);
             vmax = _mm256_max_ps(vmax, v);
             vmin = _mm256_min_ps(vmin, v);
         }
@@ -186,126 +99,95 @@ T data_range(const T *data, size_t num) {
         float tmp_max[8], tmp_min[8];
         _mm256_storeu_ps(tmp_max, vmax);
         _mm256_storeu_ps(tmp_min, vmin);
-        
-        for (int k = 0; k < 8; ++k) {
-            max_val = std::max(max_val, tmp_max[k]);
-            min_val = std::min(min_val, tmp_min[k]);
+
+        out_max = tmp_max[0];
+        out_min = tmp_min[0];
+        for (int k = 1; k < 8; ++k) {
+            out_max = std::max(out_max, tmp_max[k]);
+            out_min = std::min(out_min, tmp_min[k]);
+        }
+
+        for (; i < end; ++i) {
+            out_max = std::max(out_max, data[i]);
+            out_min = std::min(out_min, data[i]);
         }
     }
-    for (size_t k = num - res; k < num; ++k){
-        max_val = std::max(max_val, data[k]);
-        min_val = std::min(min_val, data[k]);
-    }
-    return max_val - min_val;
-#else
-        __m256 vmax = _mm256_set1_ps(data[0]);
-        __m256 vmin = _mm256_set1_ps(data[0]);
-        for (; i + 7 < num; i += 8) {
-            __m256 v = _mm256_loadu_ps(data + i);
-            vmax = _mm256_max_ps(vmax, v);
-            vmin = _mm256_min_ps(vmin, v);
-        }
+    else if constexpr (std::is_same_v<T, double>) {
+        __m256d vmax = _mm256_set1_pd(data[begin]);
+        __m256d vmin = _mm256_set1_pd(data[begin]);
 
-        float tmp_max[8];
-        float tmp_min[8];
-        _mm256_storeu_ps(tmp_max, vmax);
-        _mm256_storeu_ps(tmp_min, vmin);
-
-        float maxval = tmp_max[0], minval = tmp_min[0];
-        for (int k = 1; k < 8; ++k){
-            maxval = std::max(maxval, tmp_max[k]);
-            minval = std::min(minval, tmp_min[k]);
-        }
-
-        for (; i < num; ++i){
-            maxval = std::max(maxval, data[i]);
-            minval = std::min(minval, data[i]);
-        }
-        return maxval - minval;
-#endif   
-    }
-    else if constexpr (is_double){
-#ifdef _OPENMP
-    int res = num % 4;
-    double max_val = data[0];
-    double min_val = data[0];
-    #pragma omp parallel reduction(min:min_val) reduction(max:max_val)
-    {
-        size_t i = 0;
-        __m256d vmax = _mm256_set1_pd(data[0]);
-        __m256d vmin = _mm256_set1_pd(data[0]);
-
-        #pragma omp for nowait
-        for (i = 0; i < num - res; i += 4) {
-            __m256d v = _mm256_loadu_pd(data + i);
+        size_t i = begin;
+        for (; i + 4 <= end; i += 4) {
+            const __m256d v = _mm256_loadu_pd(data + i);
             vmax = _mm256_max_pd(vmax, v);
             vmin = _mm256_min_pd(vmin, v);
         }
 
-        // 将向量化结果存到临时数组，归约成标量
         double tmp_max[4], tmp_min[4];
         _mm256_storeu_pd(tmp_max, vmax);
         _mm256_storeu_pd(tmp_min, vmin);
-        
-        for (int k = 0; k < 4; ++k) {
-            max_val = std::max(max_val, tmp_max[k]);
-            min_val = std::min(min_val, tmp_min[k]);
+
+        out_max = tmp_max[0];
+        out_min = tmp_min[0];
+        for (int k = 1; k < 4; ++k) {
+            out_max = std::max(out_max, tmp_max[k]);
+            out_min = std::min(out_min, tmp_min[k]);
+        }
+
+        for (; i < end; ++i) {
+            out_max = std::max(out_max, data[i]);
+            out_min = std::min(out_min, data[i]);
         }
     }
-    for (size_t k = num - res; k < num; ++k){
-        max_val = std::max(max_val, data[k]);
-        min_val = std::min(min_val, data[k]);
+    else {
+        scalar_minmax(data, begin, end, out_min, out_max);
     }
-    return max_val - min_val;
-#else
-        size_t i = 0;
-        __m256d vmax = _mm256_set1_pd(data[0]);
-        __m256d vmin = _mm256_set1_pd(data[0]);
-
-        for (; i + 3 < num; i += 4) {
-            __m256d v = _mm256_loadu_pd(data + i);
-            vmax = _mm256_max_pd(vmax, v);
-            vmin = _mm256_min_pd(vmin, v);
-        }
-
-        double tmp_max[4];
-        double tmp_min[4];
-        _mm256_storeu_pd(tmp_max, vmax);
-        _mm256_storeu_pd(tmp_min, vmin);
-
-        double maxval = tmp_max[0], minval = tmp_min[0];
-        for (int k = 1; k < 4; ++k){
-            maxval = std::max(maxval, tmp_max[k]);
-            minval = std::min(minval, tmp_min[k]);
-        }
-
-        for (; i < num; ++i){
-            maxval = std::max(maxval, data[i]);
-            minval = std::min(minval, data[i]);
-        }
-
-        return maxval  - minval;
+}
 #endif
+
+template <class T>
+T data_range(const T *data, size_t num, const bool enable_parallel = true) {
+    if (num <= 16 || !enable_parallel) {
+        T min_val, max_val;
+        scalar_minmax(data, 0, num, min_val, max_val);
+        return max_val - min_val;
     }
-    else{
-        T max = data[0];
-        T min = data[0];
-        for (size_t i = 1; i < num; ++i) {
-            if (max < data[i]) max = data[i];
-            if (min > data[i]) min = data[i];
-        }
-        return max - min;
-    }
-#else
+
+    T min_val = data[0];
+    T max_val = data[0];
 #ifdef _OPENMP
-    #pragma omp parallel for reduction(max:max_val) reduction(min:min_val)
+    #pragma omp parallel reduction(min:min_val) reduction(max:max_val)
+    {
+        const size_t thread_count = static_cast<size_t>(omp_get_num_threads());
+        const size_t thread_id = static_cast<size_t>(omp_get_thread_num());
+        const size_t base = num / thread_count;
+        const size_t remain = num % thread_count;
+        const size_t begin = thread_id * base + std::min(thread_id, remain);
+        const size_t end = begin + base + (thread_id < remain ? 1 : 0);
+
+        if (begin < end) {
+            T local_min, local_max;
+#ifdef __ARM_FEATURE_SVE2
+            sve2_minmax(data, begin, end, local_min, local_max);
+#elif defined(__AVX2__)
+            avx2_minmax(data, begin, end, local_min, local_max);
+#else
+            scalar_minmax(data, begin, end, local_min, local_max);
 #endif
-    for (size_t i = 1; i < num; ++i) {
-        if (data[i] > max_val) max_val = data[i];
-        if (data[i] < min_val) min_val = data[i];
+            min_val = std::min(min_val, local_min);
+            max_val = std::max(max_val, local_max);
+        }
     }
-    return max_val - min_val;
+#else
+#ifdef __ARM_FEATURE_SVE2
+    sve2_minmax(data, 0, num, min_val, max_val);
+#elif defined(__AVX2__)
+    avx2_minmax(data, 0, num, min_val, max_val);
+#else
+    scalar_minmax(data, 0, num, min_val, max_val);
 #endif
+#endif
+    return max_val - min_val;
 }
 
 inline int factorial(int n) { return (n == 0) || (n == 1) ? 1 : n * factorial(n - 1); }
@@ -322,22 +204,22 @@ void calAbsErrorBound(Config &conf, const T *data, T range = 0) {
     if (conf.errorBoundMode != EB_ABS) {
         if (conf.errorBoundMode == EB_REL) {
             conf.errorBoundMode = EB_ABS;
-            conf.absErrorBound = conf.relErrorBound * ((range > 0) ? range : data_range(data, conf.num));
+            conf.absErrorBound = conf.relErrorBound * ((range > 0) ? range : data_range(data, conf.num, conf.openmp));
         } else if (conf.errorBoundMode == EB_PSNR) {
             conf.errorBoundMode = EB_ABS;
             conf.absErrorBound = computeABSErrBoundFromPSNR(conf.psnrErrorBound, 0.99,
-                                                            ((range > 0) ? range : data_range(data, conf.num)));
+                                                            ((range > 0) ? range : data_range(data, conf.num, conf.openmp)));
         } else if (conf.errorBoundMode == EB_L2NORM) {
             conf.errorBoundMode = EB_ABS;
             conf.absErrorBound = sqrt(3.0 / conf.num) * conf.l2normErrorBound;
         } else if (conf.errorBoundMode == EB_ABS_AND_REL) {
             conf.errorBoundMode = EB_ABS;
             conf.absErrorBound =
-                std::min(conf.absErrorBound, conf.relErrorBound * ((range > 0) ? range : data_range(data, conf.num)));
+                std::min(conf.absErrorBound, conf.relErrorBound * ((range > 0) ? range : data_range(data, conf.num, conf.openmp)));
         } else if (conf.errorBoundMode == EB_ABS_OR_REL) {
             conf.errorBoundMode = EB_ABS;
             conf.absErrorBound =
-                std::max(conf.absErrorBound, conf.relErrorBound * ((range > 0) ? range : data_range(data, conf.num)));
+                std::max(conf.absErrorBound, conf.relErrorBound * ((range > 0) ? range : data_range(data, conf.num, conf.openmp)));
         } else {
             throw std::invalid_argument("Error bound mode not supported");
         }
