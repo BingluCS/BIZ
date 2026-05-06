@@ -105,7 +105,7 @@ double interp_compress_test(
     // }
     size_t sample_size = sampled_blocks.size();
     #ifdef _OPENMP
-    #pragma omp parallel for if(config.openmp)
+    #pragma omp parallel for if(conf.openmp)
     #endif
     for (size_t k = 0; k < sample_size; ++k) {
         auto sz =
@@ -140,7 +140,7 @@ double interp_compress_test(
     auto compression_ratio = conf.num * sampled_blocks.size() * sizeof(T) * 1.0 / cmpSize;
     
     #ifdef _OPENMP
-    #pragma omp parallel for if(config.openmp)
+    #pragma omp parallel for if(conf.openmp)
     #endif
     for (size_t k = 0; k < sample_size; ++k) {
         delete[] quant_inds[k];
@@ -283,7 +283,7 @@ size_t SZ_compress_Interp_lorenzo(Config &conf, T *data, uchar *cmpData, size_t 
         double ratios[4];
 
         #ifdef _OPENMP
-        #pragma omp parallel for if(config.openmp)
+        #pragma omp parallel for if(conf.openmp)
         #endif
         for(int i = 0; i < 4; i++) {
             size_t bufferCap = conf.num * sizeof(T);

@@ -309,8 +309,9 @@ int main(int argc, char *argv[]) {
                 if (++i == argc) usage();
                 conPath = argv[i];
                 break;
-            case 'p':
+            case 'P':
                 enable_openmp = true;
+                break;
             case '1':
                 if (++i == argc || sscanf(argv[i], "%zu", &r1) != 1) usage();
                 break;
