@@ -147,7 +147,7 @@ inline void avx2_minmax(const T *data, size_t begin, size_t end, T &out_min, T &
 
 template <class T>
 T data_range(const T *data, size_t num, const bool enable_parallel = true) {
-    if (num <= 16 || !enable_parallel) {
+    if (num <= 16) {
         T min_val, max_val;
         scalar_minmax(data, 0, num, min_val, max_val);
         return max_val - min_val;
@@ -155,6 +155,15 @@ T data_range(const T *data, size_t num, const bool enable_parallel = true) {
 
     T min_val = data[0];
     T max_val = data[0];
+    if (!enable_parallel) {
+#ifdef __ARM_FEATURE_SVE2
+        sve2_minmax(data, 0, num, min_val, max_val);
+#elif defined(__AVX2__)
+        avx2_minmax(data, 0, num, min_val, max_val);
+#else
+        scalar_minmax(data, 0, num, min_val, max_val);
+#endif
+    }
 #ifdef _OPENMP
     #pragma omp parallel reduction(min:min_val) reduction(max:max_val)
     {
@@ -178,14 +187,6 @@ T data_range(const T *data, size_t num, const bool enable_parallel = true) {
             max_val = std::max(max_val, local_max);
         }
     }
-#else
-#ifdef __ARM_FEATURE_SVE2
-    sve2_minmax(data, 0, num, min_val, max_val);
-#elif defined(__AVX2__)
-    avx2_minmax(data, 0, num, min_val, max_val);
-#else
-    scalar_minmax(data, 0, num, min_val, max_val);
-#endif
 #endif
     return max_val - min_val;
 }
