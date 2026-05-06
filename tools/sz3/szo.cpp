@@ -393,7 +393,6 @@ int main(int argc, char *argv[]) {
     }
 
     SZ3::Config conf;
-    conf.openmp = enable_openmp;
     if (r2 == 0) {
         conf = SZ3::Config(r1);
     } else if (r3 == 0) {
@@ -403,6 +402,7 @@ int main(int argc, char *argv[]) {
     } else {
         conf = SZ3::Config(r4, r3, r2, r1);
     }
+    conf.openmp = enable_openmp;
     if (compression && conPath != nullptr) {
         conf.loadcfg(conPath);
     }

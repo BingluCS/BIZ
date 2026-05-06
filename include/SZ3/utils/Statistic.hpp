@@ -163,6 +163,7 @@ T data_range(const T *data, size_t num, const bool enable_parallel = true) {
 #else
         scalar_minmax(data, 0, num, min_val, max_val);
 #endif
+        return max_val - min_val;
     }
 #ifdef _OPENMP
     #pragma omp parallel reduction(min:min_val) reduction(max:max_val)
