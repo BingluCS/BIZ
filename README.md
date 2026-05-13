@@ -1,4 +1,4 @@
-SZo: SZo: Fast and Scalable High-Ratio Scientific Error-Bounded Lossy Compression on CPUs
+#SZo: SZo: Fast and Scalable High-Ratio Scientific Error-Bounded Lossy Compression on CPUs
 
 ## Installation
 
