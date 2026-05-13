@@ -1,18 +1,13 @@
-SZ3: A Modular Error-bounded Lossy Compression Framework for Scientific Datasets
-=====
-(C) 2016 by Mathematics and Computer Science (MCS), Argonne National Laboratory. See COPYRIGHT in the top-level directory.
-
-* Major Authors: Sheng Di, Kai Zhao, Xin Liang, Jinyang Liu
-* Supervisor: Franck Cappello
-* Other Contributors: Robert Underwood, Sihuan Li, Ali M. Gok
+SZo: SZo: Fast and Scalable High-Ratio Scientific Error-Bounded Lossy Compression on CPUs
 
 ## Installation
 
 * mkdir build && cd build
-* cmake -DCMAKE_INSTALL_PREFIX:PATH=[INSTALL_DIR] ..
+* cmake -DCMAKE_INSTALL_PREFIX:PATH=[INSTALL_DIR] .. -DENABLE_AVX2=ON
 * make
 * make install
 
+The DENABLE_AVX2 option enables AVX2 instructions. This requires CPU support but will significantly accelerate performance.
 Then, you'll find all the executables in [INSTALL_DIR]/bin and header files in [INSTALL_DIR]/include
 
 
@@ -21,7 +16,7 @@ Then, you'll find all the executables in [INSTALL_DIR]/bin and header files in [
 #### SZo Executable
 * You can use the executable 'tools/sz3/szo' to do the compression/decompression.
 
-#### SZ3 C++ API
+#### SZo C++ API
 * Located in 'include/SZ3/api/sz.hpp'. 
 * Requiring a modern C++ compiler.  
 * Different with SZ2 API.
@@ -39,14 +34,9 @@ Then, you'll find all the executables in [INSTALL_DIR]/bin and header files in [
 * Please add "-DBUILD_H5Z_FILTER=ON" to enable this function for CMake.
 * sz3ToHDF5 and HDF5ToSz3 are provided for testing.
 
-#### Third-Party APIs
-
-* [SZ3 Fortran API](https://github.com/ofmla/sz3_simple_example) (by [Oscar Mojica](https://github.com/ofmla))
-* [SZ3 Rust API](https://github.com/juntyr/sz3-rs) (by [Juniper Tyree](https://github.com/juntyr))
-* [SZ3 Numcodecs API](https://github.com/juntyr/numcodecs-rs/blob/main/codecs/sz3/) (by [Juniper Tyree](https://github.com/juntyr))
 
 
-## Citations
+<!-- ## Citations
 [//]: # (**Kindly note**: If you mention SZ3 in your paper, the most appropriate citation is to include these three references &#40;**TBD22, ICDE21, Bigdata18**&#41; because they cover the design and implementation of the latest version of SZ.)
 * QOZv2 (the enhanced interpolation-based algorithm): [High-performance Effective Scientific Error-bounded Lossy Compression with Auto-tuned Multi-component Interpolation](https://dl.acm.org/doi/10.1145/3639259).
 * SZ3's interpolation-based algorithm: [Optimizing Error-Bounded Lossy Compression for Scientiﬁc Data by Dynamic Spline Interpolation](https://ieeexplore.ieee.org/document/9458791).
@@ -74,4 +64,4 @@ Version New features
 
 ## 3rd party libraries/tools
 * [Zstandard](https://facebook.github.io/zstd/) v1.4.5 will be fetched if libzstd can not be found by pkg-config.
-* The source code of ska_hash is included in SZ3.
+* The source code of ska_hash is included in SZ3. -->

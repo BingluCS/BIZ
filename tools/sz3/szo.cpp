@@ -24,6 +24,7 @@ inline void usage() {
     printf("	-h: print the help information\n");
     printf("	-h2: print the help information for SZ2 style command line\n");
     printf("	-v: print the version number\n");
+    printf("	-P: enable the OpenMP mode\n");
     printf("	-a : print compression results such as distortions\n");
     printf("* input and output:\n");
     printf("	-i <path> : original input file in binary format\n");
